@@ -177,8 +177,8 @@ def main():
     N_seeds = 10
     max_iter = 500
     N_layers = 5
-    N_max = 8
-    N_min = 8
+    N_max = 10
+    N_min = 10
     datapoints = []
     for N in range(N_min, N_max + 1):
         k = N // 2

@@ -169,8 +169,8 @@ def portfolio_ising(mu: np.ndarray, sigma: np.ndarray, alpha: float, k: int, n: 
 
 
 def save_data_to_hdf(input_data: dict) -> None:
-    max_number = max([int(f.split('.')[0]) for f in os.listdir(path='datasets_temp') if f.endswith('.hdf5')] + [0])
-    with h5py.File(name='datasets_temp/' + f'{max_number + 1}' + '.hdf5', mode='w') as __file__:
+    max_number = max([int(f.split('.')[0]) for f in os.listdir(path='datasets') if f.endswith('.hdf5')] + [0])
+    with h5py.File(name='datasets/' + f'{max_number + 1}' + '.hdf5', mode='w') as __file__:
         __file__.create_dataset(name='type', data=input_data['type'], dtype=int)
         __file__.create_dataset(name='N', data=input_data['N'], dtype=int)
         __file__.create_dataset(name='k', data=input_data['k'], dtype=int)

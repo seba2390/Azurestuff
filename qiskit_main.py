@@ -51,7 +51,7 @@ def main():
         # Initial guess for parameters (gamma, beta) of circuit
         theta_min, theta_max = -np.pi, np.pi
         N_xx_yy_angles = layers * (N - 1)
-        theta_i = np.random.uniform(low=theta_min, high=theta_max, size=N_xx_yy_angles)
+        theta_i = np.random.normal(loc=0, scale=1, size=N_xx_yy_angles)
 
         # Use the get_cost method of the specific ansatz instance
         res = sc.optimize.minimize(fun=ansatz.get_cost, x0=theta_i,
@@ -97,7 +97,7 @@ def main():
         theta_min, theta_max = -np.pi, np.pi
         N_xx_yy_angles = layers * (N - 1)
         N_z_angles = layers * N
-        theta_i = np.random.uniform(low=theta_min, high=theta_max, size=N_xx_yy_angles + N_z_angles)
+        theta_i = np.random.normal(loc=0, scale=1, size=N_xx_yy_angles + N_z_angles)
 
         # Use the get_cost method of the specific ansatz instance
         res = sc.optimize.minimize(fun=ansatz.get_cost, x0=theta_i,
@@ -140,7 +140,7 @@ def main():
 
         # Initial guess for parameters (gamma, beta) of circuit
         theta_min, theta_max = -np.pi, np.pi
-        theta_i = np.random.uniform(low=theta_min, high=theta_max, size=2 * layers)  # Adjust size for gamma and beta
+        theta_i = np.random.normal(loc=0, scale=1, size=2 * layers)  # Adjust size for gamma and beta
 
         # Use the get_cost method of the specific ansatz instance
         res = sc.optimize.minimize(fun=ansatz.get_cost, x0=theta_i,
@@ -175,8 +175,8 @@ def main():
 
     alpha = 0.001
     N_seeds = 10
-    max_iter = 500
-    N_layers = 5
+    max_iter = 200
+    N_layers = 6
     N_max = 10
     N_min = 10
     datapoints = []

@@ -126,6 +126,8 @@ class CP_QAOA:
         self.layers = layers
         self.QUBO_matrix = QUBO_matrix
         self.with_z_phase = with_z_phase
+        # Calculate the step size for distributing X gates
+        self.step_size = np.ceil(self.n_qubits / self.cardinality).astype(int)
         self.J_list, self.h_list = get_ising(Q=QUBO_matrix, offset=QUBO_offset)
         self.simulator = Aer.get_backend('statevector_simulator')
 
@@ -133,9 +135,13 @@ class CP_QAOA:
 
         qcircuit = QuantumCircuit(self.n_qubits)
 
-        # Initial state:
+        """# Initial state:
         for qubit_index in range(self.cardinality):
-            qcircuit.x(qubit_index)
+            qcircuit.x(qubit_index)"""
+
+        # Initial state: distribute X gates
+        for i in range(0, self.n_qubits, self.step_size):
+            qcircuit.x(i)
 
         # Assuming Nearest Neighbour Hamiltonian
         angles_per_layer = self.n_qubits - 1

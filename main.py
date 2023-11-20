@@ -204,7 +204,7 @@ def main():
     alpha = 0.001
     N_seeds = 10
     max_iter = 100
-    N_layers = 5
+    N_layers = 6
     N_max = 5
     N_min = 4
     datapoints = []

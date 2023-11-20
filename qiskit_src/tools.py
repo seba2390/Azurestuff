@@ -4,6 +4,8 @@ from itertools import combinations
 import numpy as np
 from numba import jit
 
+from qiskit_src.ansatz import qubo_cost
+
 
 def min_cost_partition(nr_qubits: int,
                        k: int,
@@ -68,3 +70,13 @@ def get_qubo(mu: np.ndarray, sigma: np.ndarray, alpha: float, lmbda: float, k: f
                 Q[i, j] += lmbda + alpha * sigma[i, j]
     offset = lmbda * k ** 2
     return Q, offset
+
+
+def normalized_cost(result: Dict[str, float],
+                    QUBO_matrix: np.ndarray,
+                    QUBO_offset,
+                    max_cost: float,
+                    min_cost: float) -> float:
+    best_state = list(result.keys())[np.argmax(list(result.values()))]
+    found_cost = qubo_cost(np.array([float(_) for _ in best_state]).astype(np.float64), QUBO_matrix) + QUBO_offset
+    return abs(found_cost - min_cost) / abs(max_cost - min_cost)

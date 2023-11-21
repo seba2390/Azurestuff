@@ -143,11 +143,13 @@ class CP_QAOA:
         for i in range(0, self.n_qubits, self.step_size):
             qcircuit.x(i)
 
-        # Assuming Nearest Neighbour Hamiltonian
-        angles_per_layer = self.n_qubits - 1
+        NN_angles_per_layer = self.n_qubits - 1
+        NNN_angles_per_layer = self.n_qubits - 2
+        total_NN_angles = NN_angles_per_layer * self.layers
         for layer in range(self.layers):
+            # Nearest Neighbor
             for qubit_i in range(self.n_qubits - 1):
-                theta_ij = angles[(layer * angles_per_layer) + qubit_i]
+                theta_ij = angles[(layer * NN_angles_per_layer) + qubit_i]
                 qubit_j = qubit_i + 1
 
                 # Define the Hamiltonian for XX and YY interactions
@@ -160,9 +162,22 @@ class CP_QAOA:
                 qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
 
             if self.with_z_phase:
-                angle_start_idx = self.layers * angles_per_layer
+                angle_start_idx = self.layers * NN_angles_per_layer
                 for qubit_i in range(self.n_qubits):
                     qcircuit.rz(phi=2*angles[angle_start_idx + (layer * self.n_qubits) + qubit_i], qubit=qubit_i)
+            # Next Nearest Neighbor
+            for qubit_i in range(self.n_qubits - 2):
+                theta_ij = angles[total_NN_angles + (layer * NNN_angles_per_layer) + qubit_i]
+                qubit_j = qubit_i + 2
+
+                # Define the Hamiltonian for XX and YY interactions
+                xx_term = theta_ij * (X ^ X)
+                yy_term = theta_ij * (Y ^ Y)
+                hamiltonian = xx_term + yy_term
+
+                # Create the time-evolved operator
+                time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
+                qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
 
         return qcircuit
 

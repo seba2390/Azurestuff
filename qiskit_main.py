@@ -132,7 +132,7 @@ def main():
 
         result.append(TO_STORE)
 
-        """################################################################################################
+        ################################################################################################
         ########################################## CLASSIC QAOA ########################################
         ################################################################################################
 
@@ -175,24 +175,24 @@ def main():
                     'Optimizer_maxfev': __max_iter__,
                     'Rng_seed': __seed__}
 
-        result.append(TO_STORE)"""
+        result.append(TO_STORE)
 
         return result
 
     alpha = 0.001
-    N_seeds = 10
-    max_iter = 200
-    N_layers = 5
-    N_max = 16
-    N_min = 16
+    N_seeds = 50
+    max_iter = 500
+    min_layers, max_layers = 5, 5
+    N_max = 8
+    N_min = 2
     datapoints = []
     for N in range(N_min, N_max + 1):
         k = N // 2
-        for layers in range(1, N_layers + 1):
+        for layers in range(min_layers, max_layers + 1):
             for seed in np.random.randint(low=0, high=2 ** 31, size=N_seeds):
                 datapoints.append((N, k, layers, max_iter, seed, alpha))
 
-    N_jobs = 14
+    N_jobs = 7
     r = Parallel(n_jobs=N_jobs, verbose=51, backend='loky')(delayed(simulate)(datapoint) for datapoint in datapoints)
 
     for run in r:

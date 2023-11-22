@@ -120,14 +120,28 @@ class QAOA:
 
 
 class CP_QAOA:
-    def __init__(self, N_qubits, cardinality, layers, QUBO_matrix, QUBO_offset, with_z_phase: bool = False):
+    def __init__(self,
+                 N_qubits,
+                 cardinality,
+                 layers,
+                 QUBO_matrix,
+                 QUBO_offset,
+                 with_evenly_distributed_start_x: bool = False,
+                 with_next_nearest_neighbors: bool = False,
+                 with_z_phase: bool = False):
         self.n_qubits = N_qubits
         self.cardinality = cardinality
         self.layers = layers
         self.QUBO_matrix = QUBO_matrix
+
+        self.with_evenly_distributed_start_x = with_evenly_distributed_start_x
+        self.with_next_nearest_neighbors = with_next_nearest_neighbors
         self.with_z_phase = with_z_phase
-        # Calculate the step size for distributing X gates
-        self.step_size = np.ceil(self.n_qubits / self.cardinality).astype(int)
+
+        if self.with_evenly_distributed_start_x:
+            # Calculate the step size for distributing X gates
+            self.step_size = np.ceil(self.n_qubits / self.cardinality).astype(int)
+
         self.J_list, self.h_list = get_ising(Q=QUBO_matrix, offset=QUBO_offset)
         self.simulator = Aer.get_backend('statevector_simulator')
 
@@ -135,13 +149,15 @@ class CP_QAOA:
 
         qcircuit = QuantumCircuit(self.n_qubits)
 
-        """# Initial state:
-        for qubit_index in range(self.cardinality):
-            qcircuit.x(qubit_index)"""
-
-        # Initial state: distribute X gates
-        for i in range(0, self.n_qubits, self.step_size):
-            qcircuit.x(i)
+        # Initial state
+        if self.with_evenly_distributed_start_x:
+            # Distributing x-gates across string evenly
+            for i in range(0, self.n_qubits, self.step_size):
+                qcircuit.x(i)
+        else:
+            # Setting 'k' first with x-gates
+            for qubit_index in range(self.cardinality):
+                qcircuit.x(qubit_index)
 
         NN_angles_per_layer = self.n_qubits - 1
         NNN_angles_per_layer = self.n_qubits - 2
@@ -165,19 +181,21 @@ class CP_QAOA:
                 angle_start_idx = self.layers * NN_angles_per_layer
                 for qubit_i in range(self.n_qubits):
                     qcircuit.rz(phi=2*angles[angle_start_idx + (layer * self.n_qubits) + qubit_i], qubit=qubit_i)
-            # Next Nearest Neighbor
-            for qubit_i in range(self.n_qubits - 2):
-                theta_ij = angles[total_NN_angles + (layer * NNN_angles_per_layer) + qubit_i]
-                qubit_j = qubit_i + 2
 
-                # Define the Hamiltonian for XX and YY interactions
-                xx_term = theta_ij * (X ^ X)
-                yy_term = theta_ij * (Y ^ Y)
-                hamiltonian = xx_term + yy_term
+            if self.with_next_nearest_neighbors:
+                # Next Nearest Neighbor
+                for qubit_i in range(self.n_qubits - 2):
+                    theta_ij = angles[total_NN_angles + (layer * NNN_angles_per_layer) + qubit_i]
+                    qubit_j = qubit_i + 2
 
-                # Create the time-evolved operator
-                time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
-                qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
+                    # Define the Hamiltonian for XX and YY interactions
+                    xx_term = theta_ij * (X ^ X)
+                    yy_term = theta_ij * (Y ^ Y)
+                    hamiltonian = xx_term + yy_term
+
+                    # Create the time-evolved operator
+                    time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
+                    qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
 
         return qcircuit
 

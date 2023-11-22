@@ -140,7 +140,7 @@ class CP_QAOA:
 
         if self.with_evenly_distributed_start_x:
             # Calculate the step size for distributing X gates
-            self.step_size = np.ceil(self.n_qubits / self.cardinality).astype(int)
+            self.step_size = self.n_qubits / (self.cardinality + 1)
 
         self.J_list, self.h_list = get_ising(Q=QUBO_matrix, offset=QUBO_offset)
         self.simulator = Aer.get_backend('statevector_simulator')
@@ -152,8 +152,10 @@ class CP_QAOA:
         # Initial state
         if self.with_evenly_distributed_start_x:
             # Distributing x-gates across string evenly
-            for i in range(0, self.n_qubits, self.step_size):
-                qcircuit.x(i)
+            for i in range(1, self.cardinality + 1):
+                index = int(self.step_size * i)
+                print(index)
+                qcircuit.x(index)
         else:
             # Setting 'k' first with x-gates
             for qubit_index in range(self.cardinality):

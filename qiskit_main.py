@@ -145,10 +145,10 @@ def main():
         return result
 
     alpha = 0.001
-    N_seeds = 80
-    max_iter = 500
+    N_seeds = 100
+    max_iter = 250
     min_layers, max_layers = 4, 4
-    N_max = 10
+    N_max = 15
     N_min = 2
     datapoints = []
     for N in range(N_min, N_max + 1):
@@ -157,7 +157,7 @@ def main():
             for seed in np.random.randint(low=0, high=2 ** 31, size=N_seeds):
                 datapoints.append((N, k, layers, max_iter, seed, alpha))
 
-    N_jobs = 14
+    N_jobs = 15
     r = Parallel(n_jobs=N_jobs, verbose=51, backend='loky')(delayed(simulate)(datapoint) for datapoint in datapoints)
 
     for run in r:

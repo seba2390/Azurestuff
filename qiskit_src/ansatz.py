@@ -153,9 +153,7 @@ class CP_QAOA:
         if self.with_evenly_distributed_start_x:
             # Distributing x-gates across string evenly
             for i in range(1, self.cardinality + 1):
-                index = int(self.step_size * i)
-                print(index)
-                qcircuit.x(index)
+                qcircuit.x(int(self.step_size * i))
         else:
             # Setting 'k' first with x-gates
             for qubit_index in range(self.cardinality):

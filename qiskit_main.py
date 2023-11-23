@@ -34,7 +34,8 @@ def main():
                              alpha=__alpha__,
                              lmbda=lmbda,
                              k=__k__)
-        _available_methods_ = ['COBYLA', 'Nelder-Mead']
+        _available_methods_ = ['COBYLA', 'Nelder-Mead', 'L-BFGS-B']
+
         _method_idx_ = 0
 
         # ---------------------- #

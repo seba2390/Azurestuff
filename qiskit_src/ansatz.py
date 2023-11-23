@@ -1,6 +1,8 @@
 from qiskit import QuantumCircuit, Aer, execute
 from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.opflow import X, Y, PauliOp
+from qiskit.quantum_info import state_fidelity
+
 
 import numpy as np
 from numba import jit
@@ -211,3 +213,10 @@ class CP_QAOA:
         if flip_states:
             return {bitstring[::-1]: probability for bitstring, probability in counts.items()}
         return {bitstring: probability for bitstring, probability in counts.items()}
+
+    def get_fidelity(self, angles_1, angles_2) -> float:
+        circuit_1 = self.set_circuit(angles=angles_1)
+        circuit_2 = self.set_circuit(angles=angles_2)
+        state_vector_1 = execute(circuit_1, self.simulator).result().get_statevector(circuit_1)
+        state_vector_2 = execute(circuit_2, self.simulator).result().get_statevector(circuit_2)
+        return state_fidelity(state_vector_1, state_vector_2)

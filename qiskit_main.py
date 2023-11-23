@@ -41,7 +41,7 @@ def main():
         # -- Mixer w. k first -- #
         # ---------------------- #
         w_evenly_distributed_k = True
-        w_next_nearest_neighbors = False
+        w_next_nearest_neighbors = True
         w_z_phase = False
 
         ansatz = CP_QAOA(N_qubits=__N__,
@@ -100,10 +100,10 @@ def main():
 
     alpha = 0.001
     N_seeds = 100
-    max_iter = 250
+    max_iter = 5000
     min_layers, max_layers = 5, 5
-    N_max = 12
-    N_min = 2
+    N_max = 15
+    N_min = 15
     datapoints = []
     for N in range(N_min, N_max + 1):
         k = N // 2
@@ -111,7 +111,7 @@ def main():
             for seed in np.random.randint(low=0, high=2 ** 31, size=N_seeds):
                 datapoints.append((N, k, layers, max_iter, seed, alpha))
 
-    N_jobs = 15
+    N_jobs = 60
     r = Parallel(n_jobs=N_jobs, verbose=51, backend='loky')(delayed(simulate)(datapoint) for datapoint in datapoints)
 
     for run in r:

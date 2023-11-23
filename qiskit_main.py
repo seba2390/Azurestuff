@@ -41,7 +41,7 @@ def main():
         # -- Mixer w. k first -- #
         # ---------------------- #
         w_evenly_distributed_k = True
-        w_next_nearest_neighbors = True
+        w_next_nearest_neighbors = False
         w_z_phase = False
 
         ansatz = CP_QAOA(N_qubits=__N__,
@@ -67,7 +67,6 @@ def main():
         _dict_ = ansatz.get_state_probabilities(angles=res.x, flip_states=False)
         Final_circuit_sample_states = np.array([[int(bit) for bit in key] for key in list(_dict_.keys())], dtype=int)
         Final_circuit_sample_probabilities = np.array([_dict_[key] for key in list(_dict_.keys())], dtype=np.float64)
-        status = 0 if res.status == 1 else 1
         TO_STORE = {'type': 1,
                     'N': __N__,
                     'k': __k__,
@@ -87,13 +86,69 @@ def main():
                     'Optimizer_nfev': res.nfev,
                     'Optimizer_maxfev': __max_iter__,
                     'Rng_seed': __seed__,
-                    'status': status}
+                    'status': res.status}
         result.append(TO_STORE)
+
+
+
+        # ----------------------------------- #
+        # -- Mixer w. k distributed evenly -- #
+        # ----------------------------------- #
+
+        w_evenly_distributed_k = True
+        w_next_nearest_neighbors = True
+        w_z_phase = False
+
+        __layers__ = int(np.floor((__layers__ * (N - 1)) / (N - 1 + N - 2)))
+        ansatz = CP_QAOA(N_qubits=__N__,
+                         cardinality=__k__,
+                         layers=__layers__,
+                         QUBO_matrix=Q,
+                         QUBO_offset=offset,
+                         with_evenly_distributed_start_x=w_evenly_distributed_k,
+                         with_next_nearest_neighbors=w_next_nearest_neighbors,
+                         with_z_phase=w_z_phase)
+
+        # Initial guess for parameters
+        N_xx_yy_angles = __layers__ * (N - 1)
+        if w_next_nearest_neighbors:
+            N_xx_yy_angles += __layers__ * (N - 2)
+        if w_z_phase:
+            N_xx_yy_angles += N * __layers__
+        theta_i = np.random.normal(loc=0, scale=1, size=N_xx_yy_angles)
+
+        res = sc.optimize.minimize(fun=ansatz.get_cost, x0=theta_i,
+                                   method=_available_methods_[_method_idx_],
+                                   options={'disp': False, 'maxiter': __max_iter__})
+        _dict_ = ansatz.get_state_probabilities(angles=res.x, flip_states=False)
+        Final_circuit_sample_states = np.array([[int(bit) for bit in key] for key in list(_dict_.keys())], dtype=int)
+        Final_circuit_sample_probabilities = np.array([_dict_[key] for key in list(_dict_.keys())], dtype=np.float64)
+        TO_STORE = {'type': 2,
+                    'N': __N__,
+                    'k': __k__,
+                    'layers': __layers__,
+                    'Max_cost': max_cost,
+                    'Min_cost': min_cost,
+                    'Min_cost_state': min_state,
+                    'Normalized_cost': normalized_cost(result=_dict_,
+                                                       QUBO_matrix=Q,
+                                                       QUBO_offset=offset,
+                                                       max_cost=max_cost,
+                                                       min_cost=min_cost),
+                    'Final_circuit_sample_states': Final_circuit_sample_states,
+                    'Final_circuit_sample_probabilities': Final_circuit_sample_probabilities,
+                    'Expected_returns': expected_returns,
+                    'Covariances': covariances,
+                    'Optimizer_nfev': res.nfev,
+                    'Optimizer_maxfev': __max_iter__,
+                    'Rng_seed': __seed__}
+        result.append(TO_STORE)
+
         return result
 
     alpha = 0.001
     N_seeds = 100
-    max_iter = 1000
+    max_iter = 250
     min_layers, max_layers = 5, 5
     N_max = 12
     N_min = 2

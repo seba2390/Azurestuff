@@ -8,10 +8,6 @@ numba==0.58.1
 numpy==1.23.5
 qiskit==0.44.1
 qiskit-aer==0.12.0
-qiskit-braket-provider==0.0.4
-qiskit-ibmq-provider==0.20.2
-qiskit-terra==0.25.2.1
-qujax==1.0.0
 scipy==1.11.3
 sympy==1.11.1
 tqdm==4.65.0

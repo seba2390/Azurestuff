@@ -188,6 +188,7 @@ def save_data_to_hdf(input_data: dict) -> None:
         __file__.create_dataset(name='Optimizer_nfev', data=input_data['Optimizer_nfev'], dtype=int)
         __file__.create_dataset(name='Optimizer_maxfev', data=input_data['Optimizer_maxfev'], dtype=int)
         __file__.create_dataset(name='Rng_seed', data=input_data['Rng_seed'], dtype=int)
+        __file__.create_dataset(name='status', data=input_data['status'], dtype=int)
     __file__.close()
 
 

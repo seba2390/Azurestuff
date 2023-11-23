@@ -61,15 +61,14 @@ def main():
             N_xx_yy_angles += N * __layers__
         theta_i = np.random.normal(loc=0, scale=1, size=N_xx_yy_angles)
 
-        function_values = []
+        iteration_dicts = []
 
         def callback_function(x):
-            fval = ansatz.get_cost(x)
-            function_values.append(fval)
+            iteration_dicts.append(ansatz.get_state_probabilities(angles=x, flip_states=False))
 
         res = sc.optimize.minimize(fun=ansatz.get_cost, x0=theta_i,
                                    method=_available_methods_[_method_idx_],
-                                   options={'disp': True, 'maxiter': __max_iter__},
+                                   options={'disp': False, 'maxiter': __max_iter__},
                                    callback=callback_function)
         _dict_ = ansatz.get_state_probabilities(angles=res.x, flip_states=False)
         Final_circuit_sample_states = np.array([[int(bit) for bit in key] for key in list(_dict_.keys())], dtype=int)
@@ -94,7 +93,11 @@ def main():
                     'Optimizer_maxfev': __max_iter__,
                     'Rng_seed': __seed__,
                     'status': res.status,
-                    'iteration_cost': [abs(cost - min_cost) / abs(max_cost - min_cost) for cost in function_values]}
+                    'iteration_cost': [normalized_cost(result=it,
+                                                       QUBO_matrix=Q,
+                                                       QUBO_offset=offset,
+                                                       max_cost=max_cost,
+                                                       min_cost=min_cost) for it in iteration_dicts]}
         result.append(TO_STORE)
         return result
 

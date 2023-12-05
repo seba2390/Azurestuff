@@ -1,6 +1,6 @@
 from qiskit import QuantumCircuit, Aer, execute
 from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.opflow import X, Y, PauliOp
+from qiskit.opflow import X, Y
 from qiskit.quantum_info import state_fidelity
 
 

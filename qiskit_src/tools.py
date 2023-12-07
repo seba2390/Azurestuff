@@ -80,3 +80,6 @@ def normalized_cost(result: Dict[str, float],
     best_state = list(result.keys())[np.argmax(list(result.values()))]
     found_cost = qubo_cost(np.array([float(_) for _ in best_state]).astype(np.float64), QUBO_matrix) + QUBO_offset
     return abs(found_cost - min_cost) / abs(max_cost - min_cost)
+
+
+

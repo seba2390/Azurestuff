@@ -1,12 +1,68 @@
+from typing import List, Tuple
+
 from qiskit import QuantumCircuit, Aer, execute
 from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.opflow import X, Y, PauliOp
+from qiskit.opflow import X, Y
 from qiskit.quantum_info import state_fidelity
-
 
 import numpy as np
 from numba import jit
 
+
+class Grid:
+    def __init__(self,
+                 N_qubits: int = None,
+                 Rows: int = None,
+                 Cols: int = None):
+
+        self.using_N_qubits = False
+        if N_qubits is None:
+            if Rows is None or Cols is None:
+                raise ValueError(
+                    'When the grid is not initialized using "N_qubits", it should be initialized, using "Rows" and '
+                    '"Cols".')
+        else:
+            if int(np.sqrt(N_qubits)) - np.sqrt(N_qubits) != 0:
+                raise ValueError(
+                    f'When grid is initialized w. "N_qubits" it is assumed to be a square grid, and therefore '
+                    f'"N_qubits" must be a perfect square integer. ')
+            self.N_qubits = N_qubits
+            self.using_N_qubits = True
+        if Rows is not None or Cols is not None:
+            if N_qubits is not None:
+                raise ValueError(f'When specifying the grid using "Rows" & "Cols", "N_qubits" should not be specified.')
+            if Rows is None or Cols is None:
+                raise ValueError(
+                    f'When specifying the grid without "N_qubits", both "Rows" & "Cols" has to be specified.')
+        else:
+            self.rows, self.cols = Rows, Cols
+
+    def get_grid_indexing(self) -> np.ndarray:
+        """ Here we assume a Hamiltonian path from upper right corner to lower left corner
+         ala L -> R, U -> D, R -> L ... L -> R. """
+        if self.using_N_qubits:
+            root = int(np.sqrt(self.N_qubits))
+            return np.array([[col + row * root for col in range(root)] for row in range(root)])
+        else:
+            return np.array([[col + row * self.cols for col in range(self.cols)] for row in range(self.rows)])
+
+    def get_NN_indices(self) -> List[Tuple[int, int]]:
+        """ Returns pairs of indices corresponding to
+        Nearest Neighbor interactions in the grid structure """
+        grid_indices = self.get_grid_indexing()
+        rows, cols = grid_indices.shape
+        NN_pairs = []
+        for row in range(rows):
+            for col in range(cols):
+                if row == rows - 1:
+                    if col < cols - 1:
+                        NN_pairs.append((grid_indices[row, col], grid_indices[row, col + 1]))
+                elif col == cols - 1:
+                    NN_pairs.append((grid_indices[row, col], grid_indices[row + 1, col]))
+                else:
+                    NN_pairs.append((grid_indices[row, col], grid_indices[row + 1, col]))
+                    NN_pairs.append((grid_indices[row, col], grid_indices[row, col + 1]))
+        return NN_pairs
 
 def qubo_to_ising(Q, offset=0.0):
     """Convert a QUBO problem to an Ising problem."""
@@ -128,6 +184,7 @@ class CP_QAOA:
                  layers,
                  QUBO_matrix,
                  QUBO_offset,
+                 grid = None,
                  with_evenly_distributed_start_x: bool = False,
                  with_next_nearest_neighbors: bool = False,
                  with_z_phase: bool = False):
@@ -139,6 +196,11 @@ class CP_QAOA:
         self.with_evenly_distributed_start_x = with_evenly_distributed_start_x
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
         self.with_z_phase = with_z_phase
+
+        if grid is None:
+            self.nearest_neighbor_pairs = [(i, i+1) for i in range(self.n_qubits-1)]
+        else:
+            self.nearest_neighbor_pairs = grid.get_NN_indices()
 
         if self.with_evenly_distributed_start_x:
             # Calculate the step size for distributing X gates
@@ -166,9 +228,9 @@ class CP_QAOA:
         total_NN_angles = NN_angles_per_layer * self.layers
         for layer in range(self.layers):
             # Nearest Neighbor
-            for qubit_i in range(self.n_qubits - 1):
-                theta_ij = angles[(layer * NN_angles_per_layer) + qubit_i]
-                qubit_j = qubit_i + 1
+            counter = 0
+            for (qubit_i, qubit_j) in self.nearest_neighbor_pairs:
+                theta_ij = angles[(layer * NN_angles_per_layer) + counter]
 
                 # Define the Hamiltonian for XX and YY interactions
                 xx_term = theta_ij * (X ^ X)
@@ -178,6 +240,9 @@ class CP_QAOA:
                 # Create the time-evolved operator
                 time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
                 qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
+
+                # Increment counter for angles
+                counter += 1
 
             if self.with_z_phase:
                 angle_start_idx = self.layers * NN_angles_per_layer

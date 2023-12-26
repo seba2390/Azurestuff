@@ -145,7 +145,7 @@ class CP_QAOA:
         return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO_matrix) for
                         bitstring, probability in self.counts.items()])
 
-    def get_state_probabilities(self, angles, flip_states: bool = True) -> Dict:
+    def get_state_probabilities(self, flip_states: bool = True) -> Dict:
         counts = self.counts
         if flip_states:
             return {bitstring[::-1]: probability for bitstring, probability in counts.items()}

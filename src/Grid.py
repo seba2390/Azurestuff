@@ -28,6 +28,7 @@ class Grid:
                 raise ValueError(
                     f'When specifying the grid without "N_qubits", both "Rows" & "Cols" has to be specified.')
             self.rows, self.cols = Rows, Cols
+            self.initialization_strategy = None
 
     def get_grid_indexing(self) -> np.ndarray:
         if self.using_N_qubits:
@@ -53,3 +54,22 @@ class Grid:
                     NN_pairs.append((grid_indices[row, col], grid_indices[row + 1, col]))
                     NN_pairs.append((grid_indices[row, col], grid_indices[row, col + 1]))
         return NN_pairs
+
+    def set_initialization_strategy(self, strategy: np.ndarray) -> None:
+        if strategy.shape != self.get_grid_indexing().shape:
+            raise ValueError('Strategy should be of same dimensions as the grid.')
+        if np.any((strategy != 0) & (strategy != 1)):
+            raise ValueError('Strategy should binary grid.')
+        self.initialization_strategy = strategy
+
+    def get_initialization_strategy(self) -> np.ndarray:
+        if self.initialization_strategy is None:
+            raise RuntimeError('Initialization strategy not yet defined.')
+        return self.initialization_strategy
+
+    def get_initialization_indices(self) -> List[int]:
+        if self.initialization_strategy is None:
+            raise RuntimeError('Initialization strategy not yet defined.')
+        return self.get_grid_indexing()[np.where(self.initialization_strategy == 1)].flatten().tolist()
+
+

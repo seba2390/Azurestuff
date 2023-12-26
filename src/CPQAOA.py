@@ -6,7 +6,7 @@ from qiskit.opflow import X, Y
 import numpy as np
 
 from src.Tools import qubo_cost, string_to_array
-
+from src.Grid import Grid
 
 class CP_QAOA:
     def __init__(self,
@@ -14,8 +14,10 @@ class CP_QAOA:
                  cardinality,
                  layers,
                  QUBO_matrix,
-                 grid=None,
-                 with_evenly_distributed_start_x: bool = False,
+                 grid: Grid = None,
+                 initialization_strategy: np.ndarray = None,
+                 with_z_phase: bool = False,
+                 with_initialization_strategy: bool = False,
                  with_next_nearest_neighbors: bool = False):
 
         self.n_qubits = N_qubits
@@ -23,8 +25,9 @@ class CP_QAOA:
         self.layers = layers
         self.QUBO_matrix = QUBO_matrix
 
-        self.with_evenly_distributed_start_x = with_evenly_distributed_start_x
+        self.with_initialization_strategy = with_initialization_strategy
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
+        self.with_z_phase = with_z_phase
 
         if grid is None:
             # Normal 1D chain Nearest Neighbors
@@ -33,37 +36,66 @@ class CP_QAOA:
             # Grid Nearest Neighbors
             self.nearest_neighbor_pairs = grid.get_NN_indices()
 
-        if self.with_evenly_distributed_start_x:
-            # Calculate the step size for distributing X gates
-            self.step_size = self.n_qubits / (self.cardinality + 1)
+        if self.with_initialization_strategy:
+            if grid is None and initialization_strategy is None:
+                raise ValueError(f'if "with_initialization_strategy" is set true, either a grid w. an initialization '
+                                 f'strategy or a initialization strategy should be provided')
+            elif grid is not None and initialization_strategy is not None:
+                raise ValueError(
+                    f'Either "grid" (which has init. strat.) or "initialization_strategy" should be provided - not both.')
+            elif grid is None and initialization_strategy is not None:
+                if np.any(initialization_strategy < 0) or np.any(initialization_strategy > self.n_qubits - 1):
+                    raise ValueError(f'"initialization_strategy" should only contain integers in range [0;N qubits[')
+                self.initialization_strategy = initialization_strategy
+            else:
+                self.initialization_strategy = grid.get_initialization_indices()
+
+            if len(self.initialization_strategy) != self.cardinality:
+                raise ValueError(f'Provided initialization strategy that does not match provided cardinality')
+
+            if len(list(set(self.initialization_strategy.tolist()))) != self.cardinality:
+                raise ValueError(f'Provided initialization strategy that holds multiple of same qubit idx.')
+
+        elif not self.with_initialization_strategy and grid is None:
+            print(" # === N.B. - no initialization strategy was provided === #")
 
         self.simulator = Aer.get_backend('statevector_simulator')
-
-        # print("Using cardinality: ", self.cardinality)
-        # print('Initial excitations at: ', [int(self.step_size * i) for i in range(1, self.cardinality+1)])
 
     def set_circuit(self, angles):
 
         qcircuit = QuantumCircuit(self.n_qubits)
 
         # Initial state
-        if self.with_evenly_distributed_start_x:
+        if self.with_initialization_strategy:
             # Distributing x-gates across string evenly
-            for i in range(1, self.cardinality + 1):
-                qcircuit.x(int(self.step_size * i))
+            for qubit_index in self.initialization_strategy:
+                qcircuit.x(qubit_index)
         else:
             # Setting 'k' first with x-gates
             for qubit_index in range(self.cardinality):
                 qcircuit.x(qubit_index)
 
-        NN_angles_per_layer = self.n_qubits - 1
-        NNN_angles_per_layer = self.n_qubits - 2
-        total_NN_angles = NN_angles_per_layer * self.layers
+        # Setting aside first (N-1)*L angles for NN-interactions
+        NN_angles_per_layer = len(self.nearest_neighbor_pairs)
+        NN_angles = angles[:NN_angles_per_layer * self.layers]
+        NN_counter = 0
+
+        if self.with_next_nearest_neighbors:
+            # Setting aside next (N-2)*L angles for NNN-interactions
+            NNN_angles_per_layer = self.n_qubits - 2
+            NNN_angles = angles[NN_angles_per_layer * self.layers: NNN_angles_per_layer * self.layers]
+            NNN_counter = 0
+
+        if self.with_z_phase:
+            # Setting aside last N*L angles for z-phase
+            Z_Phase_angles_per_layer = self.n_qubits - 1
+            Z_Phase_angles = angles[-Z_Phase_angles_per_layer * self.layers:]
+            Z_Phase_counter = 0
+
         for layer in range(self.layers):
             # Nearest Neighbor
-            counter = 0
             for (qubit_i, qubit_j) in self.nearest_neighbor_pairs:
-                theta_ij = angles[(layer * NN_angles_per_layer) + counter]
+                theta_ij = NN_angles[NN_counter]
 
                 # Define the Hamiltonian for XX and YY interactions
                 xx_term = theta_ij * (X ^ X)
@@ -75,12 +107,12 @@ class CP_QAOA:
                 qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
 
                 # Increment counter for angles
-                counter += 1
+                NN_counter += 1
 
             # Next Nearest Neighbor
             if self.with_next_nearest_neighbors:
                 for qubit_i in range(self.n_qubits - 2):
-                    theta_ij = angles[total_NN_angles + (layer * NNN_angles_per_layer) + qubit_i]
+                    theta_ij = NNN_angles[NNN_counter]
                     qubit_j = qubit_i + 2
 
                     # Define the Hamiltonian for XX and YY interactions
@@ -91,6 +123,17 @@ class CP_QAOA:
                     # Create the time-evolved operator
                     time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
                     qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
+
+                    # Increment counter for angles
+                    NNN_counter += 1
+
+            if self.with_z_phase:
+                for qubit_i in range(self.n_qubits):
+                    theta_i = Z_Phase_angles[Z_Phase_counter]
+                    qcircuit.rz(phi=2 * theta_i, qubit=qubit_i)
+
+                    # Increment counter for angles
+                    Z_Phase_counter += 1
 
         return qcircuit
 

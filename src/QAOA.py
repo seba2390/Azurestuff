@@ -52,8 +52,6 @@ class QAOA:
                         bitstring, probability in self.counts.items()])
 
     def get_state_probabilities(self, angles, flip_states: bool = True) -> dict:
-        #circuit = self.set_circuit(angles=angles)
-        #counts = execute(circuit, self.simulator).result().get_counts()
         counts = self.counts
         if flip_states:
             return {bitstring[::-1]: probability for bitstring, probability in counts.items()}

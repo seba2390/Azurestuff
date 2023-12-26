@@ -29,6 +29,8 @@ class CP_QAOA:
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
         self.with_z_phase = with_z_phase
 
+        self.counts = None
+
         if grid is None:
             # Normal 1D chain Nearest Neighbors
             self.nearest_neighbor_pairs = [(i, i + 1) for i in range(self.n_qubits - 1)]
@@ -139,13 +141,14 @@ class CP_QAOA:
 
     def get_cost(self, angles) -> float:
         circuit = self.set_circuit(angles=angles)
-        counts = execute(circuit, self.simulator).result().get_counts()
+        self.counts = execute(circuit, self.simulator).result().get_counts()
         return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO_matrix) for
-                        bitstring, probability in counts.items()])
+                        bitstring, probability in self.counts.items()])
 
     def get_state_probabilities(self, angles, flip_states: bool = True) -> Dict:
-        circuit = self.set_circuit(angles=angles)
-        counts = execute(circuit, self.simulator).result().get_counts()
+        #circuit = self.set_circuit(angles=angles)
+        #counts = execute(circuit, self.simulator).result().get_counts()
+        counts = self.counts
         if flip_states:
             return {bitstring[::-1]: probability for bitstring, probability in counts.items()}
         return {bitstring: probability for bitstring, probability in counts.items()}

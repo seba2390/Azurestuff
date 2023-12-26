@@ -12,6 +12,9 @@ class QAOA:
         self.J_list, self.h_list = get_ising(Q=QUBO_matrix, offset=QUBO_offset)
         self.simulator = Aer.get_backend('statevector_simulator')
 
+
+        self.counts = None
+
     def set_circuit(self, angles):
 
         gamma = angles[self.layers:]
@@ -44,13 +47,14 @@ class QAOA:
 
     def get_cost(self, angles) -> float:
         circuit = self.set_circuit(angles=angles)
-        counts = execute(circuit, self.simulator).result().get_counts()
+        self.counts = execute(circuit, self.simulator).result().get_counts()
         return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO_matrix) for
-                        bitstring, probability in counts.items()])
+                        bitstring, probability in self.counts.items()])
 
     def get_state_probabilities(self, angles, flip_states: bool = True) -> dict:
-        circuit = self.set_circuit(angles=angles)
-        counts = execute(circuit, self.simulator).result().get_counts()
+        #circuit = self.set_circuit(angles=angles)
+        #counts = execute(circuit, self.simulator).result().get_counts()
+        counts = self.counts
         if flip_states:
             return {bitstring[::-1]: probability for bitstring, probability in counts.items()}
         return {bitstring[::-1]: probability for bitstring, probability in counts.items()}

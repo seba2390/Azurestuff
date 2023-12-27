@@ -75,7 +75,7 @@ def min_cost_partition(nr_qubits: int,
 
     _lmbda_ = 0
     if min_cost_2 < min_cost_1:
-        _lmbda_ = abs(min_cost_2) - abs(min_cost_1)
+        _lmbda_ = abs(min_cost_1 - min_cost_2)
 
     _constrained_result_ = {'s': binary_comb, 'c_min': min_cost_1, 'c_max': max_cost_1}
     _full_result_ = {'s': binary_perm, 'c_min': min_cost_2, 'c_max': max_cost_2}
@@ -83,7 +83,8 @@ def min_cost_partition(nr_qubits: int,
 
 
 def get_qubo(mu: np.ndarray, sigma: np.ndarray, alpha: float, lmbda: float, k: float):
-    """Generates the QUBO for the portfolio objective: s^T*mu + alpha*(s^T*Covar*s) """
+    """Generates the QUBO for the portfolio objective: s^T*mu + alpha*(s^T*Covar*s) w. a
+    lambda penalty for more than 'k' bits set. """
     Q = np.zeros_like(sigma)
     N = Q.shape[0]
     for i in range(N):
@@ -101,6 +102,8 @@ def normalized_cost(result: Dict[str, float],
                     QUBO_offset,
                     max_cost: float,
                     min_cost: float) -> float:
+    """ Calculates the QUBO cost of the single most probable state in the
+    result state dict, and normalizes it wrt. min and max possible cost."""
     best_state = list(result.keys())[np.argmax(list(result.values()))]
     found_cost = qubo_cost(np.array([float(_) for _ in best_state]).astype(np.float64), QUBO_matrix) + QUBO_offset
     return abs(found_cost - min_cost) / abs(max_cost - min_cost)
@@ -156,3 +159,63 @@ def get_ising(Q: np.ndarray, offset: float):
         i, j = key
         J_list.append((i, j, _J_dict[key]))
     return J_list, h_list
+
+
+def check_qubo(QUBO_matrix: np.ndarray,
+               QUBO_offset: float,
+               expected_returns: np.ndarray,
+               covariances: np.ndarray,
+               alpha: float,
+               k: int):
+    """ Runs through all permutations and checks that QUBO cost is equivalent to
+    portfolio cost """
+
+    def generate_binary_permutations(n: int) -> np.ndarray:
+        """ Generates all the 2^n permutations of bitstring w. length 'n'. """
+        num_permutations = 2 ** n
+        for i in range(num_permutations):
+            _binary_string_ = bin(i)[2:].zfill(n)
+            yield np.array([int(bit) for bit in _binary_string_])
+
+    def qubo_cost(state: np.ndarray, QUBO_matrix: np.ndarray, QUBO_offset: float) -> float:
+        return np.dot(state, np.dot(QUBO_matrix, state)) + QUBO_offset
+
+    def portfolio_cost(state: np.ndarray, mu: np.ndarray, sigma: np.ndarray, alpha: float) -> float:
+        return -np.dot(state, mu) + alpha * np.dot(state, np.dot(sigma, state))
+
+    N_QUBITS = QUBO_matrix.shape[0]
+    for state in generate_binary_permutations(n=N_QUBITS):
+        QUBO_cost = qubo_cost(state=state, QUBO_matrix=QUBO_matrix, QUBO_offset=QUBO_offset)
+        PORTFOLIO_cost = portfolio_cost(state=state, mu=expected_returns, sigma=covariances, alpha=alpha)
+        if not np.isclose(QUBO_cost, PORTFOLIO_cost):
+            if np.sum(state) == k:
+                raise ValueError(f'state={"|"+"".join([str(_) for _ in state])+">"}, QUBO: {QUBO_cost}, PORTFOLIO: {PORTFOLIO_cost}')
+
+
+def qubo_limits(Q: np.ndarray, offset: float):
+    """Calculates the max and the min cost of the given qubo (and offset),
+    together with the corresponding states."""
+
+    def generate_binary_permutations(n: int) -> np.ndarray:
+        """ Generates all the 2^n permutations of bitstring w. length 'n'. """
+        num_permutations = 2 ** n
+        for i in range(num_permutations):
+            _binary_string_ = bin(i)[2:].zfill(n)
+            yield np.array([int(bit) for bit in _binary_string_])
+
+    def qubo_cost(state: np.ndarray, QUBO_matrix: np.ndarray, QUBO_offset: float) -> float:
+        return np.dot(state, np.dot(QUBO_matrix, state)) + QUBO_offset
+
+    N_QUBITS = Q.shape[0]
+    min_qubo_cost, max_qubo_cost = np.inf, -np.inf
+    min_qubo_state, max_qubo_state = None, None
+    for state in generate_binary_permutations(n=N_QUBITS):
+        c = qubo_cost(state=state, QUBO_matrix=Q, QUBO_offset=offset)
+        if c < min_qubo_cost:
+            min_qubo_cost = c
+            min_qubo_state = state
+        elif c > max_qubo_cost:
+            max_qubo_cost = c
+            max_qubo_state = state
+    return {'c_min': min_qubo_cost, 'c_max': max_qubo_cost,
+            'min_state': min_qubo_state, 'max_state': max_qubo_state}

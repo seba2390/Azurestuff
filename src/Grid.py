@@ -55,6 +55,26 @@ class Grid:
                     NN_pairs.append((grid_indices[row, col], grid_indices[row, col + 1]))
         return NN_pairs
 
+    def get_NNN_indices(self) -> List[Tuple[int, int]]:
+        """ Returns pairs of indices corresponding to both Nearest Neighbor
+        and Next Nearest Neighbor interactions in the grid structure """
+        grid_indices = self.get_grid_indexing()
+        rows, cols = grid_indices.shape
+        NN_pairs = self.get_NN_indices()
+        NNN_pairs = []
+        for row in range(rows):
+            for col in range(cols):
+                if row >= rows - 2:
+                    if col < cols - 2:
+                        NNN_pairs.append((grid_indices[row, col], grid_indices[row, col + 2]))
+                elif col >= cols - 2:
+                    NNN_pairs.append((grid_indices[row, col], grid_indices[row + 2, col]))
+                else:
+                    NNN_pairs.append((grid_indices[row, col], grid_indices[row + 2, col]))
+                    NNN_pairs.append((grid_indices[row, col], grid_indices[row, col + 2]))
+        return NN_pairs+NNN_pairs
+
+
     def set_initialization_strategy(self, strategy: np.ndarray) -> None:
         if strategy.shape != self.get_grid_indexing().shape:
             raise ValueError('Strategy should be of same dimensions as the grid.')

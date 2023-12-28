@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Union
 
 from qiskit import QuantumCircuit, Aer, execute
 from qiskit.circuit.library import PauliEvolutionGate
@@ -7,6 +7,8 @@ import numpy as np
 
 from src.Tools import qubo_cost, string_to_array
 from src.Grid import Grid
+from src.Chain import Chain
+
 
 class CP_QAOA:
     def __init__(self,
@@ -14,68 +16,40 @@ class CP_QAOA:
                  cardinality,
                  layers,
                  QUBO_matrix,
-                 grid: Grid = None,
-                 initialization_strategy: np.ndarray = None,
+                 topology: Union[Grid, Chain],
                  with_z_phase: bool = False,
-                 with_initialization_strategy: bool = False,
                  with_next_nearest_neighbors: bool = False):
 
         self.n_qubits = N_qubits
         self.cardinality = cardinality
         self.layers = layers
         self.QUBO_matrix = QUBO_matrix
-
-        self.with_initialization_strategy = with_initialization_strategy
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
         self.with_z_phase = with_z_phase
 
+        if topology.N_qubits != self.n_qubits:
+            raise ValueError(f'provided topology consists of different number of qubits that provided for this ansatz.')
+
+        # Nearest Neighbors
+        self.nearest_neighbor_pairs = topology.get_NN_indices()
+        # Nearest + Next Nearest Neighbors
+        self.next_nearest_neighbor_pairs = topology.get_NNN_indices()
+        # Strategy for which qubits to set:
+        self.initialization_strategy = topology.get_initialization_strategy()
+
+        # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None
 
-        if grid is None:
-            # Normal 1D chain Nearest Neighbors
-            self.nearest_neighbor_pairs = [(i, i + 1) for i in range(self.n_qubits - 1)]
-        else:
-            # Grid Nearest Neighbors
-            self.nearest_neighbor_pairs = grid.get_NN_indices()
-
-        if self.with_initialization_strategy:
-            if grid is None and initialization_strategy is None:
-                raise ValueError(f'if "with_initialization_strategy" is set true, either a grid w. an initialization '
-                                 f'strategy or a initialization strategy should be provided')
-            elif grid is not None and initialization_strategy is not None:
-                raise ValueError(
-                    f'Either "grid" (which has init. strat.) or "initialization_strategy" should be provided - not both.')
-            elif grid is None and initialization_strategy is not None:
-                if np.any(initialization_strategy < 0) or np.any(initialization_strategy > self.n_qubits - 1):
-                    raise ValueError(f'"initialization_strategy" should only contain integers in range [0;N qubits[')
-                self.initialization_strategy = initialization_strategy
-            else:
-                self.initialization_strategy = grid.get_initialization_indices()
-
-            if len(self.initialization_strategy) != self.cardinality:
-                raise ValueError(f'Provided initialization strategy that does not match provided cardinality')
-
-            if len(list(set(self.initialization_strategy.tolist()))) != self.cardinality:
-                raise ValueError(f'Provided initialization strategy that holds multiple of same qubit idx.')
-
-        elif not self.with_initialization_strategy and grid is None:
-            print(" # === N.B. - no initialization strategy was provided === #")
-
+        # Using state-vector sim. for theoretical accuracy
         self.simulator = Aer.get_backend('statevector_simulator')
 
     def set_circuit(self, angles):
 
         qcircuit = QuantumCircuit(self.n_qubits)
 
-        # Initial state
-        if self.with_initialization_strategy:
-            # Distributing x-gates across string evenly
-            for qubit_index in self.initialization_strategy:
-                qcircuit.x(qubit_index)
-        else:
-            # Setting 'k' first with x-gates
-            for qubit_index in range(self.cardinality):
-                qcircuit.x(qubit_index)
+        # Setting 'k' qubits to |1>
+        for qubit_index in self.initialization_strategy:
+            qcircuit.x(qubit_index)
 
         # Setting aside first (N-1)*L angles for NN-interactions
         NN_angles_per_layer = len(self.nearest_neighbor_pairs)

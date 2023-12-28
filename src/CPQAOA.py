@@ -90,7 +90,7 @@ class CP_QAOA:
 
         if self.with_z_phase:
             # Setting aside last N*L angles for z-phase
-            Z_Phase_angles_per_layer = self.n_qubits - 1
+            Z_Phase_angles_per_layer = self.n_qubits
             Z_Phase_angles = angles[-Z_Phase_angles_per_layer * self.layers:]
             Z_Phase_counter = 0
 

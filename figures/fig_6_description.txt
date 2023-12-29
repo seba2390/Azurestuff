@@ -1,0 +1,24 @@
+N = 4,6,8,12, k = N//2, max_iterations = 1000, alpha=0.5, Averaged over 100 runs, Used 3 Layers every time.
+
+Using 2D grid w. following initialization strategies:
+
+			              [[0,1],
+                                       [1,0]],
+                             
+                                      [[0,1,0],
+                                       [1,0,1]],
+                             
+                                      [[0,1,0],
+                                       [1,0,1],
+                                       [0,1,0]],
+                             
+                                      [[0,1,0,1],
+                                       [1,0,1,0],
+                                       [0,1,0,1]]
+
+Used Nearest-Neighbor interactions only.
+Initial parameters sampled random uniformly in [-2*pi;2*pi]
+Used COBYLA to optimize.
+
+The normalization of the cost is done wrt. the max cost
+of a 'N' choose 'K' state (the subspace).

@@ -1,0 +1,32 @@
+N = 9, k = 4, max_iterations = 1000, alpha=0.5, Averaged over 100 runs.
+
+Using 1D chain w. following initialization strategy:
+                [0,1,0,1,0,1,0,1,0]
+
+Used Nearest-Neighbor interactions (in 1D formation) only.
+Initial parameters sampled random uniformly in [-2*pi;2*pi]
+Used COBYLA to optimize.
+
+The normalization of the cost on the right figure is done wrt. the max cost
+of a 'N' choose 'K' state (the subspace), and since it is possible to sample
+constraint violating states from QAOA the cost might be bigger than 1.
+As such one might interpert the y-axis as "the number of times the
+cost is bigger than the max cost of the subspace".
+
+1 Layer:
+CP-VQA          : 12 angles (parameters)
+CP-VQA + Z-PHASE: 21 angles (parameters)
+QAOA            : 2 angles (parameters)
+
+2 Layers:
+CP-VQA          : 24 angles (parameters)
+CP-VQA + Z-PHASE: 42 angles (parameters)
+QAOA            : 4 angles (parameters)
+
+3 Layers:
+CP-VQA          : 36 angles (parameters)
+CP-VQA + Z-PHASE: 63 angles (parameters)
+QAOA            : 6 angles (parameters)
+
+maybe the big difference in #parameters are a part of the explenation in the difference in the results,
+i.e. - to few parameters makes ansatz "under-parametrized" and vice-verca ?

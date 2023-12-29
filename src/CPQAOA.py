@@ -58,8 +58,8 @@ class CP_QAOA:
 
         if self.with_next_nearest_neighbors:
             # Setting aside next (N-2)*L angles for NNN-interactions
-            NNN_angles_per_layer = self.n_qubits - 2
-            NNN_angles = angles[NN_angles_per_layer * self.layers: NNN_angles_per_layer * self.layers]
+            NNN_angles_per_layer = len(self.next_nearest_neighbor_pairs)
+            NNN_angles = angles[NN_angles_per_layer * self.layers:][:NNN_angles_per_layer * self.layers]
             NNN_counter = 0
 
         if self.with_z_phase:

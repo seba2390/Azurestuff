@@ -8,6 +8,7 @@ class Grid:
                  Rows: int = None,
                  Cols: int = None):
 
+        self.N_qubits = N_qubits if N_qubits is not None else Rows*Cols
         self.using_N_qubits = False
         if N_qubits is None:
             if Rows is None or Cols is None:

@@ -35,7 +35,7 @@ class CP_QAOA:
         # Nearest + Next Nearest Neighbors
         self.next_nearest_neighbor_pairs = topology.get_NNN_indices()
         # Strategy for which qubits to set:
-        self.initialization_strategy = topology.get_initialization_strategy()
+        self.initialization_strategy = topology.get_initialization_indices()
 
         # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None

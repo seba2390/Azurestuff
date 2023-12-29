@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 from itertools import combinations
 
 import numpy as np
@@ -189,7 +189,8 @@ def check_qubo(QUBO_matrix: np.ndarray,
         PORTFOLIO_cost = portfolio_cost(state=state, mu=expected_returns, sigma=covariances, alpha=alpha)
         if not np.isclose(QUBO_cost, PORTFOLIO_cost):
             if np.sum(state) == k:
-                raise ValueError(f'state={"|"+"".join([str(_) for _ in state])+">"}, QUBO: {QUBO_cost}, PORTFOLIO: {PORTFOLIO_cost}')
+                raise ValueError(
+                    f'state={"|" + "".join([str(_) for _ in state]) + ">"}, QUBO: {QUBO_cost}, PORTFOLIO: {PORTFOLIO_cost}')
 
 
 def qubo_limits(Q: np.ndarray, offset: float):
@@ -219,3 +220,62 @@ def qubo_limits(Q: np.ndarray, offset: float):
             max_qubo_state = state
     return {'c_min': min_qubo_cost, 'c_max': max_qubo_cost,
             'min_state': min_qubo_state, 'max_state': max_qubo_state}
+
+
+def plot_energy_spectrum(QUBO_matrix: np.ndarray, QUBO_offset: float, k: int):
+    def qubo_cost(state: np.ndarray, QUBO_matrix: np.ndarray, QUBO_offset: float) -> float:
+        return np.dot(state, np.dot(QUBO_matrix, state)) + QUBO_offset
+
+    def generate_binary_combinations(n: int, k: int) -> np.ndarray:
+        """ Generates all the 'n' chose 'k' combinations w. 'k' ones. """
+        num_permutations = 2 ** n
+        for indices in combinations(range(n), k):
+            # Create a numpy array of zeros of size N
+            arr = np.zeros(n, dtype=int)
+            # Set ones at the specified positions
+            arr[list(indices)] = 1
+            yield arr
+
+    __cost_state_dict__ = {}
+
+    for state in generate_binary_combinations(n=QUBO_matrix.shape[0], k=k):
+        str_rep = '|' + ''.join(str(_) for _ in state.flatten()) + '>'
+        __cost_state_dict__[str_rep] = qubo_cost(state=state, QUBO_matrix=QUBO_matrix, QUBO_offset=QUBO_offset)
+
+    return __cost_state_dict__
+
+
+def partitioned_averages(unsorted_list: List[List[Union[int, float]]]) -> Tuple[List[float], List[float]]:
+    # Sort the list of lists by their length (shortest first)
+    sorted_list = sorted(unsorted_list, key=len)
+
+    partitioned_avgs = []  # To store the partitioned averages
+    partitioned_std_devs = []  # To store the partitioned std. devs.
+
+    # Iterate over each sublist
+    for l1 in range(len(sorted_list)):
+        l1_length = len(sorted_list[l1])  # Length of the current sublist
+
+        # Add corresponding elements from longer sublists and calculate partial averages
+        _avg_ = [sorted_list[l1]]
+        for l2 in range(l1 + 1, len(sorted_list)):
+            _avg_.append(sorted_list[l2][:l1_length])
+        _std_dev_ = np.std(np.array(_avg_).astype(float), axis=0)
+        _avg_ = np.mean(np.array(_avg_).astype(float), axis=0)
+        # Append the new elements of the average to the result
+        if l1 > 0:
+            partitioned_avgs.append(_avg_[len(sorted_list[l1 - 1]):])
+            partitioned_std_devs.append(_std_dev_[len(sorted_list[l1 - 1]):])
+        else:
+            partitioned_avgs.append(_avg_)
+            partitioned_std_devs.append(_std_dev_)
+
+    # Combine all partitioned averages into a single list
+    combined_avgs = []
+    for avg_part in partitioned_avgs:
+        combined_avgs += avg_part.tolist()
+    combined_std_devs = []
+    for std_dev_part in partitioned_std_devs:
+        combined_std_devs += std_dev_part.tolist()
+
+    return combined_avgs, combined_std_devs

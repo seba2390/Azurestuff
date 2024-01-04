@@ -18,7 +18,8 @@ class CP_QAOA:
                  QUBO_matrix,
                  topology: Union[Grid, Chain],
                  with_z_phase: bool = False,
-                 with_next_nearest_neighbors: bool = False):
+                 with_next_nearest_neighbors: bool = False,
+                 backend: str = 'state_vector'):
 
         self.n_qubits = N_qubits
         self.cardinality = cardinality
@@ -40,8 +41,9 @@ class CP_QAOA:
         # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None
 
-        # Using state-vector sim. for theoretical accuracy
-        self.simulator = Aer.get_backend('statevector_simulator')
+        if backend == 'state_vector':
+            # Using state-vector sim. for theoretical accuracy
+            self.simulator = Aer.get_backend('statevector_simulator')
 
     def set_circuit(self, angles):
 

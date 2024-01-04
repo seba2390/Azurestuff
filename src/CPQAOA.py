@@ -1,4 +1,6 @@
 from typing import List, Dict, Union
+import random
+from collections import Counter
 
 from qiskit import QuantumCircuit, Aer, execute
 from qiskit.circuit.library import PauliEvolutionGate
@@ -19,7 +21,10 @@ class CP_QAOA:
                  topology: Union[Grid, Chain],
                  with_z_phase: bool = False,
                  with_next_nearest_neighbors: bool = False,
-                 backend: str = 'state_vector'):
+                 backend: str = 'state_vector',
+                 N_samples: int = 1000,
+                 seed: int = 0):
+        random.seed(seed)
 
         self.n_qubits = N_qubits
         self.cardinality = cardinality
@@ -41,9 +46,13 @@ class CP_QAOA:
         # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None
 
-        if backend == 'state_vector':
-            # Using state-vector sim. for theoretical accuracy
-            self.simulator = Aer.get_backend('statevector_simulator')
+        if backend not in ['state_vector', 'sample']:
+            raise ValueError(f'provided backend should be either "state_vector" or "sample"')
+        self.backend = backend
+        self.N_samples = N_samples
+
+        # Using state-vector sim. for theoretical accuracy
+        self.simulator = Aer.get_backend('statevector_simulator')
 
     def set_circuit(self, angles):
 
@@ -118,6 +127,16 @@ class CP_QAOA:
     def get_cost(self, angles) -> float:
         circuit = self.set_circuit(angles=angles)
         self.counts = execute(circuit, self.simulator).result().get_counts()
+        if self.backend == 'sample':
+            # Extract states and corresponding probabilities
+            state_strings = list(self.counts.keys())
+            probabilities = [self.counts[key] for key in state_strings]
+            # Sample M times according to the probabilities
+            samples = random.choices(state_strings, weights=probabilities, k=self.N_samples)
+            # Count occurrences of each state in the samples
+            sample_counts = Counter(samples)
+            # Convert counts to probabilities
+            self.counts = {key: count / self.N_samples for key, count in sample_counts.items()}
         return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO_matrix) for
                         bitstring, probability in self.counts.items()])
 

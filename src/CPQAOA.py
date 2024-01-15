@@ -8,7 +8,7 @@ from qiskit.quantum_info import Operator
 from qiskit.opflow import X, Y
 import numpy as np
 
-from src.Tools import qubo_cost, string_to_array
+from src.Tools import qubo_cost, string_to_array, create_operator, operator_expectation, get_generator
 from src.Grid import Grid
 from src.Chain import Chain
 
@@ -32,6 +32,7 @@ class CP_QAOA:
         self.cardinality = cardinality
         self.layers = layers
         self.Q = QUBO_matrix
+        self.O = create_operator(Q=self.Q)
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
         self.with_z_phase = with_z_phase
         self.with_gradient = with_gradient
@@ -178,11 +179,14 @@ class CP_QAOA:
 
         def CTP(A: np.ndarray, B: np.ndarray) -> np.ndarray:
             """CTP: Conjugate Transpose Project"""
-            return A.T.conj()@(B@A)
+            return A.T.conj() @ (B @ A)
+
+        def commutator(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+            return A @ B - B @ A
 
         derivatives = []
         for psi_i, (i, j), theta_i in zip(self.mid_circuit_states, self.mid_circuit_indices, angles):
-            U_yy_theta = U_yy(theta=theta_i, i=i, j=j)
+            """U_yy_theta = U_yy(theta=theta_i, i=i, j=j)
             U_xx_theta = U_xx(theta=theta_i, i=i, j=j)
 
             U_xx_theta_pi_plus = U_xx(theta=theta_i + np.pi/2.0, i=i, j=j)
@@ -191,12 +195,23 @@ class CP_QAOA:
             U_yy_theta_pi_plus = U_yy(theta=theta_i + np.pi / 2.0, i=i, j=j)
             U_yy_theta_pi_minus = U_yy(theta=theta_i - np.pi / 2.0, i=i, j=j)
 
-            d_c_d_theta_i_1 = CTP(psi_i, CTP(U_yy_theta, (CTP(U_xx_theta_pi_plus, self.Q) - CTP(U_xx_theta_pi_minus, self.Q))))
-            d_c_d_theta_i_2 = CTP(psi_i, CTP(U_xx_theta, (CTP(U_yy_theta_pi_plus, self.Q) - CTP(U_yy_theta_pi_minus, self.Q))))
-            d_c_d_theta_i = 0.5 * (d_c_d_theta_i_1 + d_c_d_theta_i_2)
+            d_c_d_theta_i_1 = CTP(psi_i, CTP(U_yy_theta, (CTP(U_xx_theta_pi_plus, self.O) - CTP(U_xx_theta_pi_minus, self.O))))
+            d_c_d_theta_i_2 = CTP(psi_i, CTP(U_xx_theta, (CTP(U_yy_theta_pi_plus, self.O) - CTP(U_yy_theta_pi_minus, self.O))))
+            d_c_d_theta_i = 0.5 * (d_c_d_theta_i_1 + d_c_d_theta_i_2)"""
+            qcircuit = QuantumCircuit(self.n_qubits)
+            # Define the Hamiltonian for XX and YY interactions
+            xx_term = theta_i * (X ^ X)
+            yy_term = theta_i * (Y ^ Y)
+            hamiltonian = xx_term + yy_term
+            # Create the time-evolved operator
+            time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
+            qcircuit.append(time_evolved_operator, [i, j])
+            U_G_theta = np.array(Operator(qcircuit))
+            d_c_d_theta_i = 1j / 2.0 * CTP(psi_i, CTP(U_G_theta,
+                                                      commutator(get_generator(i, j, theta_i, self.n_qubits), self.O)))
             derivatives.append(d_c_d_theta_i)
 
-        return np.array(derivatives)
+        return np.real_if_close(np.array(derivatives))
 
     def get_state_probabilities(self, flip_states: bool = True) -> Dict:
         counts = self.counts

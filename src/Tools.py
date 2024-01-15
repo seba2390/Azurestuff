@@ -1,6 +1,10 @@
 from typing import List, Tuple, Dict, Union
 from itertools import combinations
 
+from qiskit.quantum_info import Operator
+from qiskit.quantum_info.operators import Pauli
+from qiskit.opflow import X, Y, I
+
 import numpy as np
 from numba import jit
 
@@ -279,3 +283,62 @@ def partitioned_averages(unsorted_list: List[List[Union[int, float]]]) -> Tuple[
         combined_std_devs += std_dev_part.tolist()
 
     return combined_avgs, combined_std_devs
+
+
+def create_state_vector(state_str: str, probability: float) -> np.ndarray:
+    # Create a zero vector with length 2^N
+    state_vector = np.zeros(2 ** len(state_str), dtype=np.float64)
+    # Set the amplitude for the specified state
+    state_vector[int(state_str, 2)] = np.sqrt(probability)
+    return state_vector
+
+
+def create_operator(Q: np.ndarray):
+    N = Q.shape[0]
+
+    def generate_binary_permutations(n: int) -> Tuple[np.ndarray, str]:
+        """ Generates all the 2^n permutations of bitstring w. length 'n'. """
+        num_permutations = 2 ** n
+        for i in range(num_permutations):
+            _binary_string_ = bin(i)[2:].zfill(n)
+            yield np.array([int(bit) for bit in _binary_string_]), _binary_string_
+
+    def qubo_cost(state: np.ndarray, QUBO_matrix: np.ndarray) -> float:
+        return np.dot(state, np.dot(QUBO_matrix, state))
+
+    operator = np.zeros(shape=(2 ** N, 2 ** N), dtype=np.float64)
+    for (array_perm, string_perm) in generate_binary_permutations(n=N):
+        E_i = qubo_cost(state=array_perm, QUBO_matrix=Q)
+        state_vector = create_state_vector(state_str=string_perm, probability=1.0)
+        operator += E_i * np.outer(state_vector, state_vector)
+    return operator
+
+
+def get_generator(i: int, j: int, theta: float, N: int) -> np.ndarray:
+    if i == 0 or j == 0:
+        res_x, res_y = 'X', 'Y'
+        for qubit_idx in range(1, N):
+            if j == qubit_idx or i == qubit_idx:
+                res_x += 'X'
+                res_y += 'Y'
+            else:
+                res_x += 'I'
+                res_y += 'I'
+    else:
+        res_x, res_y = 'I', 'I'
+        for qubit_idx in range(1, N):
+            if j == qubit_idx or i == qubit_idx:
+                res_x += 'X'
+                res_y += 'Y'
+            else:
+                res_x += 'I'
+                res_y += 'I'
+    return theta * (np.array(Operator(Pauli(res_x))) + np.array(Operator(Pauli(res_y))))
+
+
+def operator_expectation(O: np.ndarray, probability_dict: dict):
+    vals = []
+    for (binary_state_str, probability) in probability_dict.items():
+        state_vector = create_state_vector(state_str=binary_state_str, probability=probability)
+        vals.append(state_vector.T.conj() @ (O @ state_vector))
+    return np.mean(vals)

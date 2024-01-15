@@ -39,7 +39,7 @@ class CP_QAOA:
         self.mid_circuit_states, self.mid_circuit_unitaries = None, None
         if self.with_gradient:
             self.mid_circuit_states = []
-            self.mid_circuit_unitaries = []
+            self.mid_circuit_indices = []
 
         if topology.N_qubits != self.n_qubits:
             raise ValueError(f'provided topology consists of different number of qubits that provided for this ansatz.')
@@ -104,11 +104,7 @@ class CP_QAOA:
                 if self.with_gradient:
                     psi_i = np.array(execute(qcircuit, self.simulator).result().get_statevector())
                     self.mid_circuit_states.append(psi_i)
-                    qc_1, qc_2 = QuantumCircuit(self.n_qubits), QuantumCircuit(self.n_qubits)
-                    qc_1.append(PauliEvolutionGate((theta_ij + np.pi / 2) * (X ^ X) + (theta_ij + np.pi / 2) * (Y ^ Y), time=1.0))
-                    qc_2.append(PauliEvolutionGate((theta_ij - np.pi / 2) * (X ^ X) + (theta_ij - np.pi / 2) * (Y ^ Y), time=1.0))
-                    self.mid_circuit_unitaries.append((np.array(qc_1), np.array(qc_2)))
-
+                    self.mid_circuit_indices.append((qubit_i, qubit_j))
                 qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
 
                 # Increment counter for angles
@@ -131,14 +127,7 @@ class CP_QAOA:
                     if self.with_gradient:
                         psi_i = np.array(execute(qcircuit, self.simulator).result().get_statevector())
                         self.mid_circuit_states.append(psi_i)
-                        qc_1, qc_2 = QuantumCircuit(self.n_qubits), QuantumCircuit(self.n_qubits)
-                        qc_1.append(
-                            PauliEvolutionGate((theta_ij + np.pi / 2) * (X ^ X) + (theta_ij + np.pi / 2) * (Y ^ Y),
-                                               time=1.0))
-                        qc_2.append(
-                            PauliEvolutionGate((theta_ij - np.pi / 2) * (X ^ X) + (theta_ij - np.pi / 2) * (Y ^ Y),
-                                               time=1.0))
-                        self.mid_circuit_unitaries.append((np.array(qc_1), np.array(qc_2)))
+                        self.mid_circuit_indices.append((qubit_i, qubit_j))
                     qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
                     # Increment counter for angles
                     NNN_counter += 1
@@ -147,16 +136,11 @@ class CP_QAOA:
                 for qubit_i in range(self.n_qubits):
                     theta_i = Z_Phase_angles[Z_Phase_counter]
                     # For gradient calculation
-                    if self.with_gradient:
+                    """if self.with_gradient:
                         psi_i = np.array(execute(qcircuit, self.simulator).result().get_statevector())
                         self.mid_circuit_states.append(psi_i)
-                        qc_1, qc_2 = QuantumCircuit(self.n_qubits), QuantumCircuit(self.n_qubits)
-                        qc_1.rz(phi=2 * (theta_i + np.pi / 2), qubit=qubit_i)
-                        qc_2.rz(phi=2 * (theta_i - np.pi / 2), qubit=qubit_i)
-                        self.mid_circuit_unitaries.append((np.array(qc_1), np.array(qc_2)))
-
+                        self.mid_circuit_indices.append((qubit_i, qubit_j))"""
                     qcircuit.rz(phi=2 * theta_i, qubit=qubit_i)
-
                     # Increment counter for angles
                     Z_Phase_counter += 1
 
@@ -180,12 +164,38 @@ class CP_QAOA:
 
     def get_gradient(self, angles) -> np.ndarray:
         """ Using parameter shift rule to calculate exact derivatives"""
+        assert not self.with_z_phase, 'not implemented for "with z-phase" yet...'
+
+        def U_yy(theta, i, j) -> np.ndarray:
+            QC = QuantumCircuit(self.n_qubits)
+            QC.ryy(theta=theta, qubit1=i, qubit2=j)
+            return np.array(Operator(QC))
+
+        def U_xx(theta, i, j) -> np.ndarray:
+            QC = QuantumCircuit(self.n_qubits)
+            QC.rxx(theta=theta, qubit1=i, qubit2=j)
+            return np.array(Operator(QC))
+
+        def CTP(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+            """CTP: Conjugate Transpose Project"""
+            return A.T.conj()@(B@A)
+
         derivatives = []
-        for psi_i, unitaries in zip(self.mid_circuit_states, self.mid_circuit_unitaries):
-            U_1, U_2 = unitaries
-            d_c_d_theta_i = 1/2*((psi_i.conj().T @ (U_1.conj().T @ (self.Q @ (U_1 @ psi_i))))
-                                 - (psi_i.conj().T @ (U_2.conj().T @ (self.Q @ (U_2 @ psi_i)))))
+        for psi_i, (i, j), theta_i in zip(self.mid_circuit_states, self.mid_circuit_indices, angles):
+            U_yy_theta = U_yy(theta=theta_i, i=i, j=j)
+            U_xx_theta = U_xx(theta=theta_i, i=i, j=j)
+
+            U_xx_theta_pi_plus = U_xx(theta=theta_i + np.pi/2.0, i=i, j=j)
+            U_xx_theta_pi_minus = U_xx(theta=theta_i - np.pi/2.0, i=i, j=j)
+
+            U_yy_theta_pi_plus = U_yy(theta=theta_i + np.pi / 2.0, i=i, j=j)
+            U_yy_theta_pi_minus = U_yy(theta=theta_i - np.pi / 2.0, i=i, j=j)
+
+            d_c_d_theta_i_1 = CTP(psi_i, CTP(U_yy_theta, (CTP(U_xx_theta_pi_plus, self.Q) - CTP(U_xx_theta_pi_minus, self.Q))))
+            d_c_d_theta_i_2 = CTP(psi_i, CTP(U_xx_theta, (CTP(U_yy_theta_pi_plus, self.Q) - CTP(U_yy_theta_pi_minus, self.Q))))
+            d_c_d_theta_i = 0.5 * (d_c_d_theta_i_1 + d_c_d_theta_i_2)
             derivatives.append(d_c_d_theta_i)
+
         return np.array(derivatives)
 
     def get_state_probabilities(self, flip_states: bool = True) -> Dict:

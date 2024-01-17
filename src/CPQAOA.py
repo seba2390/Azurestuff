@@ -25,8 +25,11 @@ class CP_QAOA:
                  with_gradient: bool = False,
                  backend: str = 'state_vector',
                  N_samples: int = 1000,
-                 seed: int = 0):
+                 seed: int = 0,
+                 debug_verbose: bool = False):
         random.seed(seed)
+
+        self.debug_verbose = debug_verbose
 
         self.n_qubits = N_qubits
         self.cardinality = cardinality
@@ -88,10 +91,16 @@ class CP_QAOA:
             Z_Phase_angles = angles[-Z_Phase_angles_per_layer * self.layers:]
             Z_Phase_counter = 0
 
+        angle_counter, state_counter = 1,1
         for layer in range(self.layers):
+            if self.debug_verbose:
+                print(f'-- Layer: {layer} --')
             # Nearest Neighbor
             for (qubit_i, qubit_j) in self.nearest_neighbor_pairs:
                 theta_ij = NN_angles[NN_counter]
+                if self.debug_verbose:
+                    print(f'adding theta: {angle_counter}')
+                    angle_counter += 1
 
                 # Define the Hamiltonian for XX and YY interactions
                 xx_term = theta_ij * (X ^ X)
@@ -103,6 +112,9 @@ class CP_QAOA:
 
                 # For gradient calculation
                 if self.with_gradient:
+                    if self.debug_verbose:
+                        print(f'adding state', state_counter)
+                        state_counter += 1
                     psi_i = np.array(execute(qcircuit, self.simulator).result().get_statevector())
                     self.mid_circuit_states.append(psi_i)
                     self.mid_circuit_indices.append((qubit_i, qubit_j))
@@ -115,6 +127,9 @@ class CP_QAOA:
             if self.with_next_nearest_neighbors:
                 for qubit_i in range(self.n_qubits - 2):
                     theta_ij = NNN_angles[NNN_counter]
+                    if self.debug_verbose:
+                        print(f'adding theta: {angle_counter}')
+                        angle_counter += 1
                     qubit_j = qubit_i + 2
 
                     # Define the Hamiltonian for XX and YY interactions
@@ -126,6 +141,9 @@ class CP_QAOA:
                     time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
                     # For gradient calculation
                     if self.with_gradient:
+                        if self.debug_verbose:
+                            print(f'adding state', state_counter)
+                            state_counter += 1
                         psi_i = np.array(execute(qcircuit, self.simulator).result().get_statevector())
                         self.mid_circuit_states.append(psi_i)
                         self.mid_circuit_indices.append((qubit_i, qubit_j))
@@ -219,25 +237,3 @@ class CP_QAOA:
             return {bitstring[::-1]: probability for bitstring, probability in counts.items()}
         return {bitstring: probability for bitstring, probability in counts.items()}
 
-    def get_layer_prob_dist(self, N_layers: int, angles) -> List[Dict]:
-        original_number_of_layers = self.layers
-        result = []
-        ## STARTING STATE ##
-        qcircuit = QuantumCircuit(self.n_qubits)
-        if self.with_evenly_distributed_start_x:
-            # Distributing x-gates across string evenly
-            for i in range(1, self.cardinality + 1):
-                qcircuit.x(int(self.step_size * i))
-        else:
-            # Setting 'k' first with x-gates
-            for qubit_index in range(self.cardinality):
-                qcircuit.x(qubit_index)
-        counts = execute(qcircuit, self.simulator).result().get_counts()
-        result.append({bitstring: probability for bitstring, probability in counts.items()})
-
-        ## REMAINING LAYERS ##
-        for layers in range(1, N_layers + 1):
-            self.layers = layers
-            result.append(self.get_state_probabilities(angles=angles, flip_states=False))
-        self.layers = original_number_of_layers
-        return result

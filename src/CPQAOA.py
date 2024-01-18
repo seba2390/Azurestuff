@@ -101,13 +101,15 @@ class CP_QAOA:
                     psi_i = np.array(execute(qcircuit, self.simulator).result().get_statevector())
                     self.mid_circuit_states.append(psi_i)
                     self.mid_circuit_indices.append((qubit_i, qubit_j))
-                # Define the Hamiltonian for XX and YY interactions
+                """# Define the Hamiltonian for XX and YY interactions
                 xx_term = theta_ij * (X ^ X)
                 yy_term = theta_ij * (Y ^ Y)
                 hamiltonian = xx_term + yy_term
                 # Create the time-evolved operator & add to circuit
                 time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
-                qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
+                qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])"""
+                qcircuit.rxx(theta=2*theta_ij, qubit1=qubit_i, qubit2=qubit_j)
+                qcircuit.ryy(theta=2*theta_ij, qubit1=qubit_i, qubit2=qubit_j)
                 XX_YY_counter += 1
 
             # Z-terms

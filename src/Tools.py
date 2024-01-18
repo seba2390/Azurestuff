@@ -314,7 +314,7 @@ def create_operator(Q: np.ndarray):
     return operator
 
 
-def get_generator(i: int, j: int, theta: float, N: int) -> np.ndarray:
+def get_generator(i: int, j: int, theta: float, N: int, flip: bool = False) -> np.ndarray:
     if i == 0 or j == 0:
         res_x, res_y = 'X', 'Y'
         for qubit_idx in range(1, N):
@@ -333,6 +333,8 @@ def get_generator(i: int, j: int, theta: float, N: int) -> np.ndarray:
             else:
                 res_x += 'I'
                 res_y += 'I'
+    if flip:
+        theta * (np.array(Operator(Pauli(res_x[::-1]))) + np.array(Operator(Pauli(res_y[::-1]))))
     return theta * (np.array(Operator(Pauli(res_x))) + np.array(Operator(Pauli(res_y))))
 
 

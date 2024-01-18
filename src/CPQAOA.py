@@ -7,6 +7,7 @@ from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import Operator
 from qiskit.opflow import X, Y
 import numpy as np
+from scipy.linalg import expm
 
 from src.Tools import qubo_cost, string_to_array, create_operator, operator_expectation, get_generator
 from src.Grid import Grid
@@ -54,6 +55,8 @@ class CP_QAOA:
         self.next_nearest_neighbor_pairs = topology.get_NNN_indices()
         # Strategy for which qubits to set:
         self.initialization_strategy = topology.get_initialization_indices()
+        # Indices to iterate over
+        self.qubit_indices = self.next_nearest_neighbor_pairs if self.with_next_nearest_neighbors else self.nearest_neighbor_pairs
 
         # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None
@@ -66,8 +69,11 @@ class CP_QAOA:
         # Using state-vector sim. for theoretical accuracy
         self.simulator = Aer.get_backend('statevector_simulator')
 
-    def set_circuit(self, angles):
+    def reset(self):
+        self.mid_circuit_states, self.mid_circuit_indices = [], []
 
+    def set_circuit(self, angles):
+        self.reset()
         qcircuit = QuantumCircuit(self.n_qubits)
 
         # Setting 'k' qubits to |1>
@@ -77,39 +83,31 @@ class CP_QAOA:
         # Setting aside first (N-1)*L angles for NN-interactions
         NN_angles_per_layer = len(self.nearest_neighbor_pairs)
         NN_angles = angles[:NN_angles_per_layer * self.layers]
-        NN_counter = 0
 
+        XX_YY_angles = list(NN_angles)
         if self.with_next_nearest_neighbors:
             # Setting aside next (N-2)*L angles for NNN-interactions
             NNN_angles_per_layer = len(self.next_nearest_neighbor_pairs)
             NNN_angles = angles[NN_angles_per_layer * self.layers:][:NNN_angles_per_layer * self.layers]
-            NNN_counter = 0
+            XX_YY_angles += list(NNN_angles)
 
-        if self.with_z_phase:
-            # Setting aside last N*L angles for z-phase
-            Z_Phase_angles_per_layer = self.n_qubits
-            Z_Phase_angles = angles[-Z_Phase_angles_per_layer * self.layers:]
-            Z_Phase_counter = 0
-
-        angle_counter, state_counter = 1,1
+        XX_YY_counter = 0
+        angle_counter, state_counter = 1, 1
         for layer in range(self.layers):
             if self.debug_verbose:
                 print(f'-- Layer: {layer} --')
-            # Nearest Neighbor
-            for (qubit_i, qubit_j) in self.nearest_neighbor_pairs:
-                theta_ij = NN_angles[NN_counter]
+            # XX+YY terms
+            for (qubit_i, qubit_j) in self.qubit_indices:
+                theta_ij = XX_YY_angles[XX_YY_counter]
                 if self.debug_verbose:
-                    print(f'adding theta: {angle_counter}')
+                    print(f'adding theta: {angle_counter}, {theta_ij}')
                     angle_counter += 1
-
                 # Define the Hamiltonian for XX and YY interactions
                 xx_term = theta_ij * (X ^ X)
                 yy_term = theta_ij * (Y ^ Y)
                 hamiltonian = xx_term + yy_term
-
                 # Create the time-evolved operator
                 time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
-
                 # For gradient calculation
                 if self.with_gradient:
                     if self.debug_verbose:
@@ -119,49 +117,19 @@ class CP_QAOA:
                     self.mid_circuit_states.append(psi_i)
                     self.mid_circuit_indices.append((qubit_i, qubit_j))
                 qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
+                XX_YY_counter += 1
 
-                # Increment counter for angles
-                NN_counter += 1
-
-            # Next Nearest Neighbor
-            if self.with_next_nearest_neighbors:
-                for qubit_i in range(self.n_qubits - 2):
-                    theta_ij = NNN_angles[NNN_counter]
-                    if self.debug_verbose:
-                        print(f'adding theta: {angle_counter}')
-                        angle_counter += 1
-                    qubit_j = qubit_i + 2
-
-                    # Define the Hamiltonian for XX and YY interactions
-                    xx_term = theta_ij * (X ^ X)
-                    yy_term = theta_ij * (Y ^ Y)
-                    hamiltonian = xx_term + yy_term
-
-                    # Create the time-evolved operator
-                    time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
-                    # For gradient calculation
-                    if self.with_gradient:
-                        if self.debug_verbose:
-                            print(f'adding state', state_counter)
-                            state_counter += 1
-                        psi_i = np.array(execute(qcircuit, self.simulator).result().get_statevector())
-                        self.mid_circuit_states.append(psi_i)
-                        self.mid_circuit_indices.append((qubit_i, qubit_j))
-                    qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])
-                    # Increment counter for angles
-                    NNN_counter += 1
-
+            # Z-terms
             if self.with_z_phase:
-                for qubit_i in range(self.n_qubits):
-                    theta_i = Z_Phase_angles[Z_Phase_counter]
+                # Setting aside last N*L angles for z-phase
+                Z_Phase_angles = angles[-self.n_qubits * self.layers:]
+                for qubit_i, theta_i in zip(list(range(self.n_qubits)), Z_Phase_angles):
                     # For gradient calculation
                     """if self.with_gradient:
                         psi_i = np.array(execute(qcircuit, self.simulator).result().get_statevector())
                         self.mid_circuit_states.append(psi_i)
                         self.mid_circuit_indices.append((qubit_i, qubit_j))"""
                     qcircuit.rz(phi=2 * theta_i, qubit=qubit_i)
-                    # Increment counter for angles
-                    Z_Phase_counter += 1
 
         return qcircuit
 
@@ -185,15 +153,8 @@ class CP_QAOA:
         """ Using parameter shift rule to calculate exact derivatives"""
         assert not self.with_z_phase, 'not implemented for "with z-phase" yet...'
 
-        def U_yy(theta, i, j) -> np.ndarray:
-            QC = QuantumCircuit(self.n_qubits)
-            QC.ryy(theta=theta, qubit1=i, qubit2=j)
-            return np.array(Operator(QC))
-
-        def U_xx(theta, i, j) -> np.ndarray:
-            QC = QuantumCircuit(self.n_qubits)
-            QC.rxx(theta=theta, qubit1=i, qubit2=j)
-            return np.array(Operator(QC))
+        # Populating stuff
+        __ = self.set_circuit(angles=angles)
 
         def CTP(A: np.ndarray, B: np.ndarray) -> np.ndarray:
             """CTP: Conjugate Transpose Project"""
@@ -204,32 +165,22 @@ class CP_QAOA:
 
         derivatives = []
         for psi_i, (i, j), theta_i in zip(self.mid_circuit_states, self.mid_circuit_indices, angles):
-            """U_yy_theta = U_yy(theta=theta_i, i=i, j=j)
-            U_xx_theta = U_xx(theta=theta_i, i=i, j=j)
-
-            U_xx_theta_pi_plus = U_xx(theta=theta_i + np.pi/2.0, i=i, j=j)
-            U_xx_theta_pi_minus = U_xx(theta=theta_i - np.pi/2.0, i=i, j=j)
-
-            U_yy_theta_pi_plus = U_yy(theta=theta_i + np.pi / 2.0, i=i, j=j)
-            U_yy_theta_pi_minus = U_yy(theta=theta_i - np.pi / 2.0, i=i, j=j)
-
-            d_c_d_theta_i_1 = CTP(psi_i, CTP(U_yy_theta, (CTP(U_xx_theta_pi_plus, self.O) - CTP(U_xx_theta_pi_minus, self.O))))
-            d_c_d_theta_i_2 = CTP(psi_i, CTP(U_xx_theta, (CTP(U_yy_theta_pi_plus, self.O) - CTP(U_yy_theta_pi_minus, self.O))))
-            d_c_d_theta_i = 0.5 * (d_c_d_theta_i_1 + d_c_d_theta_i_2)"""
             qcircuit = QuantumCircuit(self.n_qubits)
-            # Define the Hamiltonian for XX and YY interactions
-            xx_term = theta_i * (X ^ X)
-            yy_term = theta_i * (Y ^ Y)
-            hamiltonian = xx_term + yy_term
-            # Create the time-evolved operator
+            hamiltonian = theta_i * (X ^ X) + theta_i * (Y ^ Y)
             time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
             qcircuit.append(time_evolved_operator, [i, j])
             U_G_theta = np.array(Operator(qcircuit))
             d_c_d_theta_i = 1j / 2.0 * CTP(psi_i, CTP(U_G_theta,
                                                       commutator(get_generator(i, j, theta_i, self.n_qubits), self.O)))
+
+            # This below should work but sometimes is wrong??
+            """H_theta = get_generator(i, j, theta_i, self.n_qubits, flip=True)
+            U_theta = expm(-1j*H_theta)
+            d_c_d_theta_i = 1j / 2.0 * CTP(psi_i, CTP(U_theta, commutator(H_theta, self.O)))"""
+
             derivatives.append(d_c_d_theta_i)
 
-        return np.real_if_close(np.array(derivatives))
+        return np.real(np.array(derivatives))
 
     def get_state_probabilities(self, flip_states: bool = True) -> Dict:
         counts = self.counts

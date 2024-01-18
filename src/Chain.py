@@ -20,7 +20,7 @@ class Chain:
     def get_NNN_indices(self) -> List[Tuple[int, int]]:
         """ Returns pairs of indices corresponding to both Nearest Neighbor
         and Next Nearest Neighbor interactions in the 1D chain structure """
-        return [(q_1, q_1+1+i) for q_1 in range(0,self.N_qubits-2) for i in range(2)]
+        return [(q_1, q_1+1+i) for q_1 in range(0,self.N_qubits-2) for i in range(2)]+[(self.N_qubits-2,self.N_qubits-1)]
 
     def set_initialization_strategy(self, strategy: np.ndarray) -> None:
         if len(strategy) != self.N_qubits:

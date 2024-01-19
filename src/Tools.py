@@ -1,7 +1,7 @@
 from typing import List, Tuple, Dict, Union
 from itertools import combinations
 
-from qiskit.quantum_info import Operator
+from qiskit.quantum_info import Operator, SparsePauliOp
 from qiskit.quantum_info.operators import Pauli
 from qiskit.opflow import X, Y, I
 
@@ -344,3 +344,27 @@ def operator_expectation(O: np.ndarray, probability_dict: dict):
         state_vector = create_state_vector(state_str=binary_state_str, probability=probability)
         vals.append(state_vector.T.conj() @ (O @ state_vector))
     return np.mean(vals)
+
+
+def get_qiskit_H(Q: np.ndarray):
+    """ Generates H = \sum_ij q_ij(I_i-Z_i)/2(I_j-Z_j)/2 """
+
+    def get_ij_term(i: int, j: int, Q: np.ndarray) -> List[Tuple[str, float]]:
+        N = Q.shape[0]
+        I_term = ''.join('I' for qubit_idx in range(N))
+        Z_i_term = ''.join('Z' if qubit_idx == i else 'I' for qubit_idx in range(N))
+        Z_j_term = ''.join('Z' if qubit_idx == i else 'I' for qubit_idx in range(N))
+        # Pauli matrices are idempotent: x^2=y^2=z^2=I
+        if i == j:
+            Z_ij_term = I_term
+        else:
+            Z_ij_term = ''.join('Z' if qubit_idx == i or qubit_idx == j else 'I' for qubit_idx in range(N))
+        total_ij_term = [(I_term, Q[i, j] / 4), (Z_i_term, -Q[i, j] / 4), (Z_j_term, -Q[i, j] / 4),
+                         (Z_ij_term, Q[i, j] / 4)]
+        return total_ij_term
+
+    H = []
+    for i in range(Q.shape[0]):
+        for j in range(Q.shape[1]):
+            H += get_ij_term(i, j, Q)
+    return SparsePauliOp.from_list(H)

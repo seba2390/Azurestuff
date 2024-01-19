@@ -11,7 +11,7 @@ from qiskit.primitives import Estimator
 from qiskit_algorithms.gradients import ParamShiftEstimatorGradient
 import numpy as np
 from scipy.linalg import expm
-from Tools import get_qiskit_H
+from src.Tools import get_qiskit_H
 
 from src.Tools import qubo_cost, string_to_array, create_operator, operator_expectation, get_generator
 from src.Grid import Grid

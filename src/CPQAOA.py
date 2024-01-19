@@ -104,8 +104,8 @@ class CP_QAOA:
                 # Create the time-evolved operator & add to circuit
                 time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
                 qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])"""
-                qcircuit.rxx(theta=2*theta_ij, qubit1=qubit_i, qubit2=qubit_j)
-                qcircuit.ryy(theta=2*theta_ij, qubit1=qubit_i, qubit2=qubit_j)
+                qcircuit.rxx(theta=2 * theta_ij, qubit1=qubit_i, qubit2=qubit_j)
+                qcircuit.ryy(theta=2 * theta_ij, qubit1=qubit_i, qubit2=qubit_j)
                 XX_YY_counter += 1
 
             # Z terms
@@ -130,8 +130,11 @@ class CP_QAOA:
             sample_counts = Counter(samples)
             # Convert counts to probabilities
             self.counts = {key: count / self.N_samples for key, count in sample_counts.items()}
-        return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
-                        bitstring, probability in self.counts.items()])
+        """return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
+                        bitstring, probability in self.counts.items()])"""
+        H_c = np.array(Operator(get_qiskit_H(Q=self.Q)))
+        state_vector = np.array(execute(circuit, self.simulator).result().get_statevector()).flatten()
+        return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))
 
     def get_gradient(self, angles) -> np.ndarray:
         """ Using parameter shift rule to calculate exact derivatives"""
@@ -167,22 +170,22 @@ class CP_QAOA:
             for (qubit_i, qubit_j) in self.qubit_indices:
                 theta_ij = XX_YY_angles[XX_YY_counter]
 
-                qcircuit.rxx(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
-                qcircuit.ryy(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
+                qcircuit.rxx(theta=2*theta_ij, qubit1=qubit_i, qubit2=qubit_j)
+                qcircuit.ryy(theta=2*theta_ij, qubit1=qubit_i, qubit2=qubit_j)
                 XX_YY_counter += 1
 
             # Z-terms
             if self.with_z_phase:
                 for qubit_i in range(self.n_qubits):
                     theta_i = Z_angles[Z_counter]
-                    qcircuit.rz(phi=theta_i, qubit=qubit_i)
+                    qcircuit.rz(phi=2*theta_i, qubit=qubit_i)
                     Z_counter += 1
 
         # Get cost hamiltonian
         H_c = get_qiskit_H(Q=self.Q)
 
         # Parameter values list (multiplying w. 2 as values in set circuit = 2*angle)
-        param_values = [[2*theta for theta in angles]]
+        param_values = [[theta for theta in angles]]
 
         # Define the gradient
         gradient = ParamShiftEstimatorGradient(Estimator())
@@ -192,11 +195,10 @@ class CP_QAOA:
                                        observables=H_c,
                                        parameter_values=param_values).result().gradients
 
-        return pse_grad_result
+        return np.array(pse_grad_result).flatten()
 
     def get_state_probabilities(self, flip_states: bool = True) -> Dict:
         counts = self.counts
         if flip_states:
             return {bitstring[::-1]: probability for bitstring, probability in counts.items()}
         return {bitstring: probability for bitstring, probability in counts.items()}
-

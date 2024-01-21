@@ -11,8 +11,9 @@ from qiskit.primitives import Estimator
 from qiskit_algorithms.gradients import ParamShiftEstimatorGradient, LinCombEstimatorGradient, FiniteDiffEstimatorGradient
 import numpy as np
 from scipy.linalg import expm
-from src.Tools import get_qiskit_H
+import torch
 
+from src.Tools import get_qiskit_H
 from src.Tools import qubo_cost, string_to_array, create_operator, operator_expectation, get_generator
 from src.Grid import Grid
 from src.Chain import Chain
@@ -69,53 +70,25 @@ class CP_QAOA:
         self.simulator = Aer.get_backend('statevector_simulator')
 
     def set_circuit(self, angles):
+        __angles__ = iter(angles)
+
+        # Defining circuit
         qcircuit = QuantumCircuit(self.n_qubits)
 
         # Setting 'k' qubits to |1>
         for qubit_index in self.initialization_strategy:
             qcircuit.x(qubit_index)
 
-        # Setting aside first (N-1)*L angles for NN-interactions
-        NN_angles_per_layer = len(self.nearest_neighbor_pairs)
-        NN_angles = angles[:NN_angles_per_layer * self.layers]
-
-        XX_YY_angles = list(NN_angles)
-        if self.with_next_nearest_neighbors:
-            # Setting aside next (N-2)*L angles for NNN-interactions
-            NNN_angles_per_layer = len(self.next_nearest_neighbor_pairs)
-            NNN_angles = angles[NN_angles_per_layer * self.layers:][:NNN_angles_per_layer * self.layers]
-            XX_YY_angles += list(NNN_angles)
-
-        XX_YY_angles = iter(XX_YY_angles)
-        Z_angles = None
-        if self.with_z_phase:
-            # Setting aside last N*L angles for z-phase
-            Z_angles = iter(list(angles[-self.n_qubits * self.layers:]))
-
-        XX_YY_counter, Z_counter = 0, 0
         for layer in range(self.layers):
             # XX+YY terms
             for (qubit_i, qubit_j) in self.qubit_indices:
-                #theta_ij = XX_YY_angles[XX_YY_counter]
-                theta_ij = next(XX_YY_angles)
-
-                """# Define the Hamiltonian for XX and YY interactions
-                xx_term = theta_ij * (X ^ X)
-                yy_term = theta_ij * (Y ^ Y)
-                hamiltonian = xx_term + yy_term
-                # Create the time-evolved operator & add to circuit
-                time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
-                qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])"""
+                theta_ij = next(__angles__)
                 qcircuit.rxx(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
                 qcircuit.ryy(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
-                #XX_YY_counter += 1
-
             # Z terms
             if self.with_z_phase:
                 for qubit_i in range(self.n_qubits):
-                    #theta_i = Z_angles[Z_counter]
-                    qcircuit.rz(phi=next(Z_angles), qubit=qubit_i)
-                    #Z_counter += 1
+                    qcircuit.rz(phi=next(__angles__), qubit=qubit_i)
 
         return qcircuit
 
@@ -142,46 +115,26 @@ class CP_QAOA:
         """ Using parameter shift rule to calculate exact derivatives"""
 
         params = [Parameter(f'theta_{i}') for i in range(len(angles))]
+        __angles__ = iter(params)
 
+        # Defining circuit
         qcircuit = QuantumCircuit(self.n_qubits)
 
         # Setting 'k' qubits to |1>
         for qubit_index in self.initialization_strategy:
             qcircuit.x(qubit_index)
 
-        # Setting aside first (N-1)*L angles for NN-interactions
-        NN_angles_per_layer = len(self.nearest_neighbor_pairs)
-        NN_angles = params[:NN_angles_per_layer * self.layers]
-
-        XX_YY_angles = list(NN_angles)
-        if self.with_next_nearest_neighbors:
-            # Setting aside next (N-2)*L angles for NNN-interactions
-            NNN_angles_per_layer = len(self.next_nearest_neighbor_pairs)
-            NNN_angles = params[NN_angles_per_layer * self.layers:][:NNN_angles_per_layer * self.layers]
-            XX_YY_angles += list(NNN_angles)
-
-        Z_angles = None
-        if self.with_z_phase:
-            # Setting aside last N*L angles for z-phase
-            Z_angles = params[-self.n_qubits * self.layers:]
-
-        XX_YY_counter = 0
-        Z_counter = 0
         for layer in range(self.layers):
             # XX+YY terms
             for (qubit_i, qubit_j) in self.qubit_indices:
-                theta_ij = XX_YY_angles[XX_YY_counter]
-
+                theta_ij = next(__angles__)
                 qcircuit.rxx(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
                 qcircuit.ryy(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
-                XX_YY_counter += 1
 
-            # Z-terms
+            # Z terms
             if self.with_z_phase:
                 for qubit_i in range(self.n_qubits):
-                    theta_i = Z_angles[Z_counter]
-                    qcircuit.rz(phi=theta_i, qubit=qubit_i)
-                    Z_counter += 1
+                    qcircuit.rz(phi=next(__angles__), qubit=qubit_i)
 
         # Get cost hamiltonian
         H_c = get_qiskit_H(Q=self.Q)
@@ -194,7 +147,8 @@ class CP_QAOA:
 
         # Evaluate the gradient of the circuits using parameter shift gradients
         pse_grad_result = gradient.run(circuits=[qcircuit],
-                                       observables=H_c,
+                                       observables=[H_c],
+                                       parameters=[params],
                                        parameter_values=param_values).result().gradients
 
         return np.array(pse_grad_result).flatten()

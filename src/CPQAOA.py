@@ -8,7 +8,7 @@ from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import Operator
 from qiskit.opflow import X, Y
 from qiskit.primitives import Estimator
-from qiskit_algorithms.gradients import ParamShiftEstimatorGradient
+from qiskit_algorithms.gradients import ParamShiftEstimatorGradient, LinCombEstimatorGradient, FiniteDiffEstimatorGradient
 import numpy as np
 from scipy.linalg import expm
 from src.Tools import get_qiskit_H
@@ -86,16 +86,18 @@ class CP_QAOA:
             NNN_angles = angles[NN_angles_per_layer * self.layers:][:NNN_angles_per_layer * self.layers]
             XX_YY_angles += list(NNN_angles)
 
+        XX_YY_angles = iter(XX_YY_angles)
         Z_angles = None
         if self.with_z_phase:
             # Setting aside last N*L angles for z-phase
-            Z_angles = angles[-self.n_qubits * self.layers:]
+            Z_angles = iter(list(angles[-self.n_qubits * self.layers:]))
 
         XX_YY_counter, Z_counter = 0, 0
         for layer in range(self.layers):
             # XX+YY terms
             for (qubit_i, qubit_j) in self.qubit_indices:
-                theta_ij = XX_YY_angles[XX_YY_counter]
+                #theta_ij = XX_YY_angles[XX_YY_counter]
+                theta_ij = next(XX_YY_angles)
 
                 """# Define the Hamiltonian for XX and YY interactions
                 xx_term = theta_ij * (X ^ X)
@@ -104,16 +106,16 @@ class CP_QAOA:
                 # Create the time-evolved operator & add to circuit
                 time_evolved_operator = PauliEvolutionGate(hamiltonian, time=1.0)
                 qcircuit.append(time_evolved_operator, [qubit_i, qubit_j])"""
-                qcircuit.rxx(theta=2 * theta_ij, qubit1=qubit_i, qubit2=qubit_j)
-                qcircuit.ryy(theta=2 * theta_ij, qubit1=qubit_i, qubit2=qubit_j)
-                XX_YY_counter += 1
+                qcircuit.rxx(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
+                qcircuit.ryy(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
+                #XX_YY_counter += 1
 
             # Z terms
             if self.with_z_phase:
                 for qubit_i in range(self.n_qubits):
-                    theta_i = Z_angles[Z_counter]
-                    qcircuit.rz(phi=2 * theta_i, qubit=qubit_i)
-                    Z_counter += 1
+                    #theta_i = Z_angles[Z_counter]
+                    qcircuit.rz(phi=next(Z_angles), qubit=qubit_i)
+                    #Z_counter += 1
 
         return qcircuit
 
@@ -170,15 +172,15 @@ class CP_QAOA:
             for (qubit_i, qubit_j) in self.qubit_indices:
                 theta_ij = XX_YY_angles[XX_YY_counter]
 
-                qcircuit.rxx(theta=2*theta_ij, qubit1=qubit_i, qubit2=qubit_j)
-                qcircuit.ryy(theta=2*theta_ij, qubit1=qubit_i, qubit2=qubit_j)
+                qcircuit.rxx(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
+                qcircuit.ryy(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
                 XX_YY_counter += 1
 
             # Z-terms
             if self.with_z_phase:
                 for qubit_i in range(self.n_qubits):
                     theta_i = Z_angles[Z_counter]
-                    qcircuit.rz(phi=2*theta_i, qubit=qubit_i)
+                    qcircuit.rz(phi=theta_i, qubit=qubit_i)
                     Z_counter += 1
 
         # Get cost hamiltonian
@@ -188,7 +190,7 @@ class CP_QAOA:
         param_values = [[theta for theta in angles]]
 
         # Define the gradient
-        gradient = ParamShiftEstimatorGradient(Estimator())
+        gradient = FiniteDiffEstimatorGradient(Estimator(), epsilon=0.001)
 
         # Evaluate the gradient of the circuits using parameter shift gradients
         pse_grad_result = gradient.run(circuits=[qcircuit],

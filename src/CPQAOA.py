@@ -7,7 +7,6 @@ from qiskit.circuit import Parameter
 from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import Operator
 import numpy as np
-from scipy.linalg import expm
 import torch
 
 from src.Tools import get_qiskit_H
@@ -15,100 +14,7 @@ from src.Tools import qubo_cost, string_to_array, create_operator, operator_expe
 from src.Grid import Grid
 from src.Tools import get_full_hamiltonian
 from src.Chain import Chain
-
-
-def create_Rxx_matrix(n_qubits: int, qubit_1: int, qubit_2: int, angle: torch.Tensor) -> torch.Tensor:
-    # Check if qubit indices are within the range
-    if qubit_1 >= n_qubits or qubit_2 >= n_qubits or qubit_1 < 0 or qubit_2 < 0:
-        raise ValueError("Qubit indices are out of bounds.")
-    elif qubit_1 == qubit_2:
-        raise ValueError("Qubit indices are equal (the should be different)")
-    # Pauli X gate
-    X = torch.tensor([[0, 1], [1, 0]], dtype=torch.complex128)
-    # Identity matrix for other qubits
-    I = torch.eye(2, dtype=torch.complex128)
-    # Create the full tensor product for the R_xx gate
-    if qubit_1 == 0 or qubit_2 == 0:
-        gate = X
-    else:
-        gate = I
-    for i in range(1, n_qubits):
-        if i == qubit_1 or i == qubit_2:
-            gate = torch.kron(gate, X)
-        else:
-            gate = torch.kron(gate, I)
-    # R_xx gate matrix
-    R_xx = torch.matrix_exp(-1j * angle / 2 * gate)
-    return R_xx
-
-
-def create_Rz_matrix(n_qubits: int, qubit: int, angle: torch.Tensor) -> torch.Tensor:
-    # Check if qubit indices are within the range
-    if qubit >= n_qubits or qubit < 0:
-        raise ValueError("Qubit indices are out of bounds.")
-    # Pauli Z gate
-    Z = torch.tensor([[1, 0], [0, -1]], dtype=torch.complex128)
-    # Identity matrix for other qubits
-    I = torch.eye(2, dtype=torch.complex128)
-    # Create the full tensor product for the R_z gate
-    if qubit:
-        gate = Z
-    else:
-        gate = I
-    for i in range(1, n_qubits):
-        if i == qubit:
-            gate = torch.kron(gate, Z)
-        else:
-            gate = torch.kron(gate, I)
-    # R_z gate matrix
-    R_z = torch.matrix_exp(-1j * angle / 2 * gate)
-    return R_z
-
-
-def create_Ryy_matrix(n_qubits: int, qubit_1: int, qubit_2: int, angle: torch.Tensor) -> torch.Tensor:
-    # Check if qubit indices are within the range
-    if qubit_1 >= n_qubits or qubit_2 >= n_qubits or qubit_1 < 0 or qubit_2 < 0:
-        raise ValueError("Qubit indices are out of bounds.")
-    elif qubit_1 == qubit_2:
-        raise ValueError("Qubit indices are equal (the should be different)")
-    # Pauli Y gate
-    Y = torch.tensor([[0, -1j], [1j, 0]], dtype=torch.complex128)
-    # Identity matrix for other qubits
-    I = torch.eye(2, dtype=torch.complex128)
-    # Create the full tensor product for the R_yy gate
-    if qubit_1 == 0 or qubit_2 == 0:
-        gate = Y
-    else:
-        gate = I
-    for i in range(1, n_qubits):
-        if i == qubit_1 or i == qubit_2:
-            gate = torch.kron(gate, Y)
-        else:
-            gate = torch.kron(gate, I)
-    # R_yy gate matrix
-    R_yy = torch.matrix_exp(-1j * angle / 2 * gate)
-    return R_yy
-
-
-def create_x_matrix(n_qubits, qubit) -> torch.Tensor:
-    # Check if qubit indices are within the range
-    if qubit >= n_qubits or qubit < 0:
-        raise ValueError("Qubit indices are out of bounds.")
-    # Pauli X gate
-    X = torch.tensor([[0, 1], [1, 0]], dtype=torch.complex128)
-    # Identity matrix for other qubits
-    I = torch.eye(2, dtype=torch.complex128)
-    # Create the full tensor product for the x gate
-    if qubit == 0:
-        gate = X
-    else:
-        gate = I
-    for i in range(1, n_qubits):
-        if i == qubit:
-            gate = torch.kron(gate, X)
-        else:
-            gate = torch.kron(gate, I)
-    return gate
+from src.TorchQcircuit import *
 
 
 class CP_QAOA:
@@ -185,7 +91,8 @@ class CP_QAOA:
                     for qubit_i in range(self.n_qubits):
                         qcircuit.rz(phi=next(__angles__), qubit=qubit_i)
             else:
-                H = get_full_hamiltonian(indices=self.qubit_indices, angles=angles, N_qubits=self.n_qubits, with_z_phase=self.with_z_phase)
+                H = get_full_hamiltonian(indices=self.qubit_indices, angles=angles, N_qubits=self.n_qubits,
+                                         with_z_phase=self.with_z_phase)
                 U_H = PauliEvolutionGate(H, time=1.0)
                 qcircuit.append(U_H, list(set([q[0] for q in self.qubit_indices] + [q[1] for q in self.qubit_indices])))
         return qcircuit
@@ -203,11 +110,11 @@ class CP_QAOA:
             sample_counts = Counter(samples)
             # Convert counts to probabilities
             self.counts = {key: count / self.N_samples for key, count in sample_counts.items()}
-        return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
-                        bitstring, probability in self.counts.items()])
-        #H_c = np.array(Operator(get_qiskit_H(Q=self.Q)))
-        #state_vector = np.array(execute(circuit, self.simulator).result().get_statevector()).flatten()
-        #return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))
+        #return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
+        #                bitstring, probability in self.counts.items()])
+        H_c = np.array(Operator(get_qiskit_H(Q=self.Q)))
+        state_vector = np.array(execute(circuit, self.simulator).result().get_statevector()).flatten()
+        return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))
 
     def get_gradient(self, angles) -> np.ndarray:
         """ Using parameter shift rule to calculate exact derivatives"""
@@ -215,16 +122,12 @@ class CP_QAOA:
                                     requires_grad=True)
 
         # Defining circuit
-
-        psi_0 = torch.tensor([1.0] + [0.0 for _ in range(2 ** self.n_qubits - 1)],
-                             dtype=torch.complex128,
-                             requires_grad=True)
-
+        qcirc = QuantumCircuit(self.n_qubits)
         # Setting 'k' qubits to |1>
         for qubit_index in self.initialization_strategy:
-            X_i = create_x_matrix(n_qubits=self.n_qubits, qubit=qubit_index)
-            psi_0 = torch.matmul(X_i, psi_0)
-
+            qcirc.x(qubit_index)
+        psi_0 = torch.tensor(np.array(execute(qcirc, self.simulator).result().get_statevector(),dtype=complex).flatten(),
+                             dtype=torch.complex128, requires_grad=True)
         counter = 0
         for layer in range(self.layers):
             # XX+YY terms
@@ -240,7 +143,7 @@ class CP_QAOA:
                 for qubit_i in range(self.n_qubits):
                     theta_i = torch_angles[counter]
                     rz = create_Rz_matrix(n_qubits=self.n_qubits, qubit=qubit_i, angle=theta_i)
-                    psi_0 = torch.matmul(rz,psi_0)
+                    psi_0 = torch.matmul(rz, psi_0)
                     counter += 1
 
         # Get cost hamiltonian

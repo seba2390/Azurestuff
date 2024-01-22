@@ -91,7 +91,9 @@ class CP_QAOA:
                     for qubit_i in range(self.n_qubits):
                         qcircuit.rz(phi=next(__angles__), qubit=qubit_i)
             else:
-                H = get_full_hamiltonian(indices=self.qubit_indices, angles=angles, N_qubits=self.n_qubits,
+                H = get_full_hamiltonian(indices=self.qubit_indices,
+                                         angles=angles,
+                                         N_qubits=self.n_qubits,
                                          with_z_phase=self.with_z_phase)
                 U_H = PauliEvolutionGate(H, time=1.0)
                 qcircuit.append(U_H, list(set([q[0] for q in self.qubit_indices] + [q[1] for q in self.qubit_indices])))
@@ -114,7 +116,7 @@ class CP_QAOA:
         #                bitstring, probability in self.counts.items()])
         H_c = np.array(Operator(get_qiskit_H(Q=self.Q)))
         state_vector = np.array(execute(circuit, self.simulator).result().get_statevector()).flatten()
-        return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))
+        return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector)))) #/ 2.0**self.n_qubits
 
     def get_gradient(self, angles) -> np.ndarray:
         """ Using parameter shift rule to calculate exact derivatives"""
@@ -130,21 +132,30 @@ class CP_QAOA:
                              dtype=torch.complex128, requires_grad=True)
         counter = 0
         for layer in range(self.layers):
-            # XX+YY terms
-            for (qubit_i, qubit_j) in self.qubit_indices:
-                theta_ij = torch_angles[counter]
-                rxx = create_Rxx_matrix(n_qubits=self.n_qubits, qubit_1=qubit_i, qubit_2=qubit_j, angle=theta_ij)
-                ryy = create_Ryy_matrix(n_qubits=self.n_qubits, qubit_1=qubit_i, qubit_2=qubit_j, angle=theta_ij)
-                psi_0 = torch.matmul(ryy, torch.matmul(rxx, psi_0))
-                counter += 1
-
-            # Z terms
-            if self.with_z_phase:
-                for qubit_i in range(self.n_qubits):
-                    theta_i = torch_angles[counter]
-                    rz = create_Rz_matrix(n_qubits=self.n_qubits, qubit=qubit_i, angle=theta_i)
-                    psi_0 = torch.matmul(rz, psi_0)
+            if self.approximate_hamiltonian:
+                # XX+YY terms
+                for (qubit_i, qubit_j) in self.qubit_indices:
+                    theta_ij = torch_angles[counter]
+                    rxx = create_Rxx_matrix(n_qubits=self.n_qubits, qubit_1=qubit_i, qubit_2=qubit_j, angle=theta_ij)
+                    ryy = create_Ryy_matrix(n_qubits=self.n_qubits, qubit_1=qubit_i, qubit_2=qubit_j, angle=theta_ij)
+                    psi_0 = torch.matmul(ryy, torch.matmul(rxx, psi_0))
                     counter += 1
+
+                # Z terms
+                if self.with_z_phase:
+                    for qubit_i in range(self.n_qubits):
+                        theta_i = torch_angles[counter]
+                        rz = create_Rz_matrix(n_qubits=self.n_qubits, qubit=qubit_i, angle=theta_i)
+                        psi_0 = torch.matmul(rz, psi_0)
+                        counter += 1
+            else:
+                raise ValueError('Gradient Not working for full Hamiltonian yet')
+                """H = get_full_torch_hamiltonian(indices=self.qubit_indices,
+                                               angles=torch_angles,
+                                               N_qubits=self.n_qubits,
+                                               with_z_phase=self.with_z_phase)
+                U = torch.matrix_exp(-1j * H)
+                psi_0 = torch.matmul(U, psi_0)"""
 
         # Get cost hamiltonian
         H_c = torch.tensor(np.array(Operator(get_qiskit_H(Q=self.Q))),

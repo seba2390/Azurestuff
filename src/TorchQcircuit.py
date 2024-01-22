@@ -104,7 +104,9 @@ def create_Ryy_matrix(n_qubits: int, qubit_1: int, qubit_2: int, angle: torch.Te
     R_yy = torch.matrix_exp(-1j * angle / 2 * generator)
     return R_yy
 
-def get_full_torch_hamiltonian(indices: List[Tuple[int, int]], angles: torch.Tensor, N_qubits: int, with_z_phase: bool = False):
+
+def get_full_torch_hamiltonian(indices: List[Tuple[int, int]], angles: torch.Tensor, N_qubits: int,
+                               with_z_phase: bool = False):
     terms = []
     X = torch.tensor([[0, 1], [1, 0]], dtype=torch.complex128)
     Y = torch.tensor([[0, -1j], [1j, 0]], dtype=torch.complex128)

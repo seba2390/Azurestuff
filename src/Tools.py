@@ -3,7 +3,7 @@ from itertools import combinations
 
 from qiskit.quantum_info import Operator, SparsePauliOp
 from qiskit.quantum_info.operators import Pauli
-from qiskit.opflow import X, Y, I
+from qiskit.opflow import X, Y, Z, I
 
 import numpy as np
 from numba import jit
@@ -368,3 +368,38 @@ def get_qiskit_H(Q: np.ndarray):
         for j in range(Q.shape[1]):
             H += get_ij_term(i, j, Q)
     return SparsePauliOp.from_list(H)
+
+
+def get_full_hamiltonian(indices: List[Tuple[int, int]], angles: List[float], N_qubits: int, with_z_phase: bool = False):
+    terms = []
+    for (qubit_i, qubit_j), theta_ij in zip(indices, angles[:len(indices)]):
+        if qubit_i == 0 or qubit_j == 0:
+            H_x, H_y = X, Y
+        else:
+            H_x, H_y = I, I
+        for q in range(1, N_qubits):
+            if q == qubit_i or q == qubit_j:
+                H_x = H_x ^ X
+                H_y = H_y ^ Y
+            else:
+                H_x = H_x ^ I
+                H_y = H_y ^ I
+        H_ij = float(theta_ij) * (H_x + H_y)
+        terms.append(H_ij)
+    if with_z_phase:
+        for qubit_i, theta_i in zip(list(range(N_qubits)), angles[len(angles):]):
+            if qubit_i == 0:
+                H_z = Z
+            else:
+                H_z = I
+            for q in range(1, N_qubits):
+                if q == qubit_i:
+                    H_z = H_z ^ Z
+                else:
+                    H_z = H_z ^ I
+            H_i = float(theta_i) * H_z
+            terms.append(H_i)
+    H = terms[0]
+    for term in terms[1:]:
+        H += term
+    return H

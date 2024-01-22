@@ -13,6 +13,7 @@ import torch
 from src.Tools import get_qiskit_H
 from src.Tools import qubo_cost, string_to_array, create_operator, operator_expectation, get_generator
 from src.Grid import Grid
+from src.Tools import get_full_hamiltonian
 from src.Chain import Chain
 
 
@@ -120,6 +121,7 @@ class CP_QAOA:
                  with_z_phase: bool = False,
                  with_next_nearest_neighbors: bool = False,
                  with_gradient: bool = False,
+                 approximate_hamiltonian: bool = True,
                  backend: str = 'state_vector',
                  N_samples: int = 1000,
                  seed: int = 0,
@@ -135,6 +137,7 @@ class CP_QAOA:
         self.O = create_operator(Q=self.Q)
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
         self.with_z_phase = with_z_phase
+        self.approximate_hamiltonian = approximate_hamiltonian
         self.with_gradient = with_gradient
 
         if topology.N_qubits != self.n_qubits:
@@ -171,16 +174,20 @@ class CP_QAOA:
             qcircuit.x(qubit_index)
 
         for layer in range(self.layers):
-            # XX+YY terms
-            for (qubit_i, qubit_j) in self.qubit_indices:
-                theta_ij = next(__angles__)
-                qcircuit.rxx(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
-                qcircuit.ryy(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
-            # Z terms
-            if self.with_z_phase:
-                for qubit_i in range(self.n_qubits):
-                    qcircuit.rz(phi=next(__angles__), qubit=qubit_i)
-
+            if self.approximate_hamiltonian:
+                # XX+YY terms
+                for (qubit_i, qubit_j) in self.qubit_indices:
+                    theta_ij = next(__angles__)
+                    qcircuit.rxx(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
+                    qcircuit.ryy(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
+                # Z terms
+                if self.with_z_phase:
+                    for qubit_i in range(self.n_qubits):
+                        qcircuit.rz(phi=next(__angles__), qubit=qubit_i)
+            else:
+                H = get_full_hamiltonian(indices=self.qubit_indices, angles=angles, N_qubits=self.n_qubits, with_z_phase=self.with_z_phase)
+                U_H = PauliEvolutionGate(H, time=1.0)
+                qcircuit.append(U_H, list(set([q[0] for q in self.qubit_indices] + [q[1] for q in self.qubit_indices])))
         return qcircuit
 
     def get_cost(self, angles) -> float:

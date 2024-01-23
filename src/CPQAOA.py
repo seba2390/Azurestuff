@@ -95,7 +95,7 @@ class CP_QAOA:
                                          angles=angles[layer*len(angles)//self.layers:(layer+1)*len(angles)//self.layers],
                                          N_qubits=self.n_qubits,
                                          with_z_phase=self.with_z_phase)
-                U_H = PauliEvolutionGate(H, time=2.0)
+                U_H = PauliEvolutionGate(H, time=1.0)
                 qcircuit.append(U_H, list(range(self.n_qubits)))
         return qcircuit
 

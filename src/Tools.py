@@ -8,6 +8,8 @@ from qiskit.opflow import X, Y, Z, I
 import numpy as np
 from numba import jit
 
+from src.TorchQcircuit import *
+
 
 ##########################################
 # ---------- HELPER FUNCTIONS ---------- #
@@ -372,31 +374,33 @@ def get_qiskit_H(Q: np.ndarray):
 
 def get_full_hamiltonian(indices: List[Tuple[int, int]], angles: List[float], N_qubits: int, with_z_phase: bool = False):
     terms = []
+    gate_map = {'X': X, 'Y': Y, 'Z': Z, 'I': I}
     for (qubit_i, qubit_j), theta_ij in zip(indices, angles[:len(indices)]):
-        if qubit_i == 0 or qubit_j == 0:
-            H_x, H_y = X, Y
-        else:
-            H_x, H_y = I, I
-        for q in range(1, N_qubits):
-            if q == qubit_i or q == qubit_j:
-                H_x = H_x ^ X
-                H_y = H_y ^ Y
-            else:
-                H_x = H_x ^ I
-                H_y = H_y ^ I
-        H_ij = float(theta_ij) * (H_x + H_y)
+        x_str = generate_string_representation(gate_name='X',
+                                               qubit_i=qubit_i,
+                                               qubit_j=qubit_j,
+                                               N=N_qubits)
+        y_str = generate_string_representation(gate_name='Y',
+                                               qubit_i=qubit_i,
+                                               qubit_j=qubit_j,
+                                               N=N_qubits)
+        x_gates, y_gates = [gate_map[gate] for gate in x_str], [gate_map[gate] for gate in y_str]
+        H_xx, H_yy = x_gates[0], y_gates[0]
+        for x_gate, y_gate in zip(x_gates[1:],y_gates[1:]):
+            H_xx = H_xx ^ x_gate
+            H_yy = H_yy ^ y_gate
+        H_ij = float(theta_ij) * (H_xx + H_yy)
         terms.append(H_ij)
     if with_z_phase:
         for qubit_i, theta_i in zip(list(range(N_qubits)), angles[len(angles):]):
-            if qubit_i == 0:
-                H_z = Z
-            else:
-                H_z = I
-            for q in range(1, N_qubits):
-                if q == qubit_i:
-                    H_z = H_z ^ Z
-                else:
-                    H_z = H_z ^ I
+            z_str = generate_string_representation_single(gate_name='Z',
+                                                          qubit_i=qubit_i,
+                                                          N=N_qubits)
+            z_gates = [gate_map[gate] for gate in z_str]
+            H_z = z_gates[0]
+            for gate in z_gates[1:]:
+                H_z = H_z ^ gate
+
             H_i = float(theta_i) * H_z
             terms.append(H_i)
     H = terms[0]

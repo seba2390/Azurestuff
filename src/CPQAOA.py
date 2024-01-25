@@ -30,6 +30,7 @@ class CP_QAOA:
                  with_next_nearest_neighbors: bool = False,
                  with_gradient: bool = False,
                  approximate_hamiltonian: bool = True,
+                 normalize_cost: bool = False,
                  backend: str = 'state_vector',
                  N_samples: int = 1000,
                  seed: int = 0,
@@ -46,6 +47,7 @@ class CP_QAOA:
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
         self.with_z_phase = with_z_phase
         self.approximate_hamiltonian = approximate_hamiltonian
+        self.normalize_cost = normalize_cost
         self.with_gradient = with_gradient
 
         if topology.N_qubits != self.n_qubits:
@@ -115,11 +117,14 @@ class CP_QAOA:
             sample_counts = Counter(samples)
             # Convert counts to probabilities
             self.counts = {key: count / self.N_samples for key, count in sample_counts.items()}
-        #return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
-        #                bitstring, probability in self.counts.items()])
+        """return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
+                        bitstring, probability in self.counts.items()])"""
         H_c = np.array(Operator(get_qiskit_H(Q=self.Q)))
         state_vector = np.array(execute(circuit, self.simulator).result().get_statevector()).flatten()
-        return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))
+        if self.normalize_cost:
+            return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector)))) / 2.0 ** self.n_qubits
+        else:
+            return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))
 
     def get_gradient(self, angles) -> np.ndarray:
         """ Using parameter shift rule to calculate exact derivatives"""
@@ -164,7 +169,10 @@ class CP_QAOA:
         H_c = torch.tensor(np.array(Operator(get_qiskit_H(Q=self.Q))),
                            dtype=torch.complex128,
                            requires_grad=True)
-        c = torch.real(torch.dot(torch.conj(psi_0), torch.matmul(H_c, psi_0)))
+        if self.normalize_cost:
+            c = torch.real(torch.dot(torch.conj(psi_0), torch.matmul(H_c, psi_0))) / 2.0 ** self.n_qubits
+        else:
+            c = torch.real(torch.dot(torch.conj(psi_0), torch.matmul(H_c, psi_0)))
         c.backward()
 
         # Extracting and returning the gradient as a numpy array

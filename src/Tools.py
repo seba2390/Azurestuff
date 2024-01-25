@@ -403,8 +403,8 @@ def get_full_hamiltonian(indices: List[Tuple[int, int]], angles: List[float], N_
                                                           N=N_qubits)
             z_gates = [gate_map[gate] for gate in z_str[::-1]]
             H_z = z_gates[0]
-            for gate in z_gates[1:]:
-                H_z = H_z ^ gate
+            for z_gate in z_gates[1:]:
+                H_z = np.kron(H_z, z_gate)
 
             H_i = float(theta_i) * H_z
             terms.append(H_i)

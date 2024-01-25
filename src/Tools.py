@@ -3,7 +3,8 @@ from itertools import combinations
 
 from qiskit.quantum_info import Operator, SparsePauliOp
 from qiskit.quantum_info.operators import Pauli
-#from qiskit.opflow import X, Y, Z, I
+# from qiskit.opflow import X, Y, Z, I
+from scipy.sparse import csc_matrix, csr_matrix, kron, identity
 
 import numpy as np
 from numba import jit
@@ -372,13 +373,16 @@ def get_qiskit_H(Q: np.ndarray):
     return SparsePauliOp.from_list(H)
 
 
-def get_full_hamiltonian(indices: List[Tuple[int, int]], angles: List[float], N_qubits: int, with_z_phase: bool = False):
+I = identity(2, format='csc', dtype=np.complex64)
+X = csc_matrix(np.array([[0, 1], [1, 0]], dtype=np.complex64))
+Y = csc_matrix(np.array([[0, -1j], [1j, 0]], dtype=np.complex64))
+Z = csc_matrix(np.array([[1, 0], [0, -1]], dtype=np.complex64))
+gate_map = {'X': X, 'Y': Y, 'Z': Z, 'I': I}
+
+
+def get_full_hamiltonian(indices: List[Tuple[int, int]], angles: List[float], N_qubits: int,
+                         with_z_phase: bool = False):
     terms = []
-    X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
-    Y = np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
-    Z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
-    I = np.eye(2, dtype=np.complex128)
-    gate_map = {'X': X, 'Y': Y, 'Z': Z, 'I': I}
     for (qubit_i, qubit_j), theta_ij in zip(indices, angles[:len(indices)]):
         x_str = generate_string_representation(gate_name='X',
                                                qubit_i=qubit_i,
@@ -391,10 +395,9 @@ def get_full_hamiltonian(indices: List[Tuple[int, int]], angles: List[float], N_
         x_gates, y_gates = [gate_map[gate] for gate in x_str[::-1]], [gate_map[gate] for gate in y_str[::-1]]
         H_xx, H_yy = x_gates[0], y_gates[0]
         for x_gate, y_gate in zip(x_gates[1:], y_gates[1:]):
-            H_xx = np.kron(H_xx, x_gate)
-            H_yy = np.kron(H_yy, y_gate)
+            H_xx = kron(H_xx, x_gate)
+            H_yy = kron(H_yy, y_gate)
         H_ij = float(theta_ij) * (H_xx + H_yy)
-
         terms.append(H_ij)
     if with_z_phase:
         for qubit_i, theta_i in zip(list(range(N_qubits)), angles[len(angles):]):
@@ -404,11 +407,11 @@ def get_full_hamiltonian(indices: List[Tuple[int, int]], angles: List[float], N_
             z_gates = [gate_map[gate] for gate in z_str[::-1]]
             H_z = z_gates[0]
             for z_gate in z_gates[1:]:
-                H_z = np.kron(H_z, z_gate)
+                H_z = kron(H_z, z_gate)
 
             H_i = float(theta_i) * H_z
             terms.append(H_i)
     H = terms[0]
     for term in terms[1:]:
         H += term
-    return Operator(H)
+    return Operator(H.todense())

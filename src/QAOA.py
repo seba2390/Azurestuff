@@ -1,10 +1,13 @@
+from typing import List, Tuple, Union
+
 from qiskit import QuantumCircuit, Aer, execute
 from qiskit.quantum_info import Operator
 from scipy.linalg import expm
 import numpy as np
 
-from src.Tools import get_ising, qubo_cost, string_to_array, get_full_hamiltonian
-
+from src.Tools import get_ising, qubo_cost, string_to_array, get_full_hamiltonian, get_qiskit_H
+from src.Grid import Grid
+from src.Chain import Chain
 
 
 class QAOA:
@@ -14,7 +17,8 @@ class QAOA:
                  QUBO_matrix,
                  QUBO_offset,
                  constraining_mixer: bool = False,
-                 mixer_qubit_indices: List[Tuple[int, int]] = None):
+                 Topology: Union[Grid, Chain] = None,
+                 normalize_cost: bool = False):
         self.n_qubits = N_qubits
         self.layers = layers
         self.QUBO_matrix = QUBO_matrix
@@ -22,9 +26,12 @@ class QAOA:
         self.simulator = Aer.get_backend('statevector_simulator')
         self.constraining_mixer = constraining_mixer
         if constraining_mixer:
-            if mixer_qubit_indices is None:
+            if Topology is None:
                 raise ValueError(f'"mixer_qubit_indices" should be provided when "constraining_mixer" is True...')
-        self.mixer_qubit_indices = mixer_qubit_indices
+            self.mixer_qubit_indices = Topology.get_NN_indices()
+            self.initialization_strategy = Topology.get_initialization_strategy()
+        self.normalize_cost = normalize_cost
+
 
         self.counts = None
 
@@ -41,6 +48,8 @@ class QAOA:
             for qubit_index in range(self.n_qubits):
                 qcircuit.h(qubit_index)
         else:
+            for qubit_index in self.initialization_strategy:
+                qcircuit.x(qubit_index)
             mixer_angles = angles[self.layers:]
 
         # For each Cost, Mixer repetition
@@ -74,8 +83,15 @@ class QAOA:
     def get_cost(self, angles) -> float:
         circuit = self.set_circuit(angles=angles)
         self.counts = execute(circuit, self.simulator).result().get_counts()
-        return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO_matrix) for
-                        bitstring, probability in self.counts.items()])
+        """return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO_matrix) for
+                        bitstring, probability in self.counts.items()])"""
+
+        H_c = np.array(Operator(get_qiskit_H(Q=self.QUBO_matrix)))
+        state_vector = np.array(execute(circuit, self.simulator).result().get_statevector()).flatten()
+        if self.normalize_cost:
+            return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector)))) / 2.0 ** self.n_qubits
+        else:
+            return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))
 
     def get_state_probabilities(self, flip_states: bool = True) -> dict:
         counts = self.counts

@@ -115,26 +115,24 @@ def get_full_torch_hamiltonian(indices: List[Tuple[int, int]], angles: torch.Ten
 
     gate_map = {'X': X, 'Y': Y, 'Z': Z, 'I': I}
 
+    Normal = True
     for (qubit_i, qubit_j), theta_ij in zip(indices, angles[:len(indices)]):
         x_str = generate_string_representation(gate_name='X',
                                                qubit_i=qubit_i,
                                                qubit_j=qubit_j,
                                                N=N_qubits)
-        # notice reversing str_repr to match qiskit convention
-        x_gates = [gate_map[gate] for gate in x_str[::-1]]
-        H_xx = x_gates[0]
-        for gate in x_gates[1:]:
-            H_xx = torch.kron(H_xx, gate)
-
         y_str = generate_string_representation(gate_name='Y',
                                                qubit_i=qubit_i,
                                                qubit_j=qubit_j,
                                                N=N_qubits)
         # notice reversing str_repr to match qiskit convention
+        x_gates = [gate_map[gate] for gate in x_str[::-1]]
+        # notice reversing str_repr to match qiskit convention
         y_gates = [gate_map[gate] for gate in y_str[::-1]]
-        H_yy = y_gates[0]
-        for gate in y_gates[1:]:
-            H_yy = torch.kron(H_yy, gate)
+        H_xx, H_yy = x_gates[0], y_gates[0]
+        for x_gate, y_gate in zip(x_gates[1:], y_gates[1:]):
+            H_xx = torch.kron(H_xx, x_gate)
+            H_yy = torch.kron(H_yy, y_gate)
 
         H_ij = theta_ij * (H_xx + H_yy)
         terms.append(H_ij)

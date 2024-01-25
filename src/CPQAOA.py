@@ -2,10 +2,12 @@ from typing import List, Dict, Union
 import random
 from collections import Counter
 
+import scipy.linalg
 from qiskit import QuantumCircuit, Aer, execute
 from qiskit.circuit import Parameter
 from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import Operator
+from scipy.linalg import expm
 import numpy as np
 import torch
 
@@ -95,7 +97,8 @@ class CP_QAOA:
                                          angles=angles[layer*len(angles)//self.layers:(layer+1)*len(angles)//self.layers],
                                          N_qubits=self.n_qubits,
                                          with_z_phase=self.with_z_phase)
-                U_H = PauliEvolutionGate(H, time=1.0)
+                time = 1.0
+                U_H = Operator(expm(-1j*time*H.data))
                 qcircuit.append(U_H, list(range(self.n_qubits)))
         return qcircuit
 

@@ -71,7 +71,7 @@ class QAOA:
                     qcircuit.rx(2 * beta[layer], qubit_i)
             else:
                 H = get_full_hamiltonian(indices=self.mixer_qubit_indices,
-                                         angles=2*[mixer_angles[layer] for idx in self.mixer_qubit_indices],
+                                         angles=[mixer_angles[layer] for idx in self.mixer_qubit_indices],
                                          N_qubits=self.n_qubits,
                                          with_z_phase=False)
                 time = 1.0

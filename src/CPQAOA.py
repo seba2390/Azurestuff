@@ -117,14 +117,16 @@ class CP_QAOA:
             sample_counts = Counter(samples)
             # Convert counts to probabilities
             self.counts = {key: count / self.N_samples for key, count in sample_counts.items()}
-        """return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
-                        bitstring, probability in self.counts.items()])"""
-        H_c = np.array(Operator(get_qiskit_H(Q=self.Q)))
+        return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
+                        bitstring, probability in self.counts.items()])
+
+        # Calculating cost this way slows down process (bigger matrix-vector products)
+        """H_c = np.array(Operator(get_qiskit_H(Q=self.Q)))
         state_vector = np.array(execute(circuit, self.simulator).result().get_statevector()).flatten()
         if self.normalize_cost:
             return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector)))) / 2.0 ** self.n_qubits
         else:
-            return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))
+            return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))"""
 
     def get_gradient(self, angles) -> np.ndarray:
         """ Using parameter shift rule to calculate exact derivatives"""

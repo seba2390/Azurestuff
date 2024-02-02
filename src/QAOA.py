@@ -84,15 +84,16 @@ class QAOA:
     def get_cost(self, angles) -> float:
         circuit = self.set_circuit(angles=angles)
         self.counts = execute(circuit, self.simulator).result().get_counts()
-        """return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO_matrix) for
-                        bitstring, probability in self.counts.items()])"""
+        return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO_matrix) for
+                        bitstring, probability in self.counts.items()])
 
-        H_c = np.array(Operator(get_qiskit_H(Q=self.QUBO_matrix)))
+        # Calculating cost this way slows down process (bigger matrix-vector products)
+        """H_c = np.array(Operator(get_qiskit_H(Q=self.QUBO_matrix)))
         state_vector = np.array(execute(circuit, self.simulator).result().get_statevector()).flatten()
         if self.normalize_cost:
             return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector)))) / 2.0 ** self.n_qubits
         else:
-            return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))
+            return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))"""
 
     def get_state_probabilities(self, flip_states: bool = True) -> dict:
         counts = self.counts

@@ -27,11 +27,10 @@ class QAOA:
         self.constraining_mixer = constraining_mixer
         if constraining_mixer:
             if Topology is None:
-                raise ValueError(f'"mixer_qubit_indices" should be provided when "constraining_mixer" is True...')
+                raise ValueError(f'"Topology" should be provided when "constraining_mixer" is True...')
             self.mixer_qubit_indices = Topology.get_NN_indices()
             self.initialization_strategy = Topology.get_initialization_strategy()
         self.normalize_cost = normalize_cost
-
 
         self.counts = None
 
@@ -43,14 +42,16 @@ class QAOA:
         qcircuit = QuantumCircuit(self.n_qubits)
 
         mixer_angles = None
-        if not self.constraining_mixer:
-            # Initial state: Hadamard gate on each qubit
-            for qubit_index in range(self.n_qubits):
-                qcircuit.h(qubit_index)
-        else:
+        if self.constraining_mixer:
+            # Initial state: k excitations
             for qubit_index in self.initialization_strategy:
                 qcircuit.x(qubit_index)
             mixer_angles = angles[self.layers:]
+
+        else:
+            # Initial state: Hadamard gate on each qubit
+            for qubit_index in range(self.n_qubits):
+                qcircuit.h(qubit_index)
 
         # For each Cost, Mixer repetition
         for layer in range(self.layers):

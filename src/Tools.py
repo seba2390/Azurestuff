@@ -415,3 +415,46 @@ def get_full_hamiltonian(indices: List[Tuple[int, int]], angles: List[float], N_
     for term in terms[1:]:
         H += term
     return Operator(H.todense())
+
+
+def get_normal_H(Q: np.ndarray, flip: bool = False) -> np.ndarray:
+    """ Generates H = \sum_ij q_ij(I_i-Z_i)/2(I_j-Z_j)/2
+    If flip is True, the same convention for indexing as in Qiskit is assumed
+    where MSB is the right most qubit in a string.
+    """
+    I = identity(2, format='csr', dtype=np.float32)
+    Z = csr_matrix(np.array([[1, 0], [0, -1]], dtype=np.float32))
+    gate_map = {'Z': Z, 'I': I}
+    def get_term(i: int):
+        N = Q.shape[0]
+        if i == N - 1:
+            _mat_rep_ = gate_map['Z']
+            _after_I_ = identity(2 ** (N - 1), format='csr')
+            _mat_rep_ = kron(_mat_rep_, _after_I_)
+        else:
+            _before_I_ = identity(2 ** (N - i - 1), format='csr')
+            _mat_rep_ = kron(_before_I_, gate_map['Z'])
+            _after_I_ = identity(2 ** i, format='csr')
+            _mat_rep_ = kron(_mat_rep_, _after_I_)
+        return csr_matrix(_mat_rep_)
+
+    def get_ij_term(i: int, j: int, Q: np.ndarray) -> csc_matrix:
+        N = Q.shape[0]
+        I_term = identity(2**Q.shape[0], format='csr', dtype=np.float32)
+        if flip:
+            Z_i_term = get_term(i=N-i-1)
+            if i == j:
+                Z_ij_term = I_term
+                Z_j_term = Z_i_term
+            else:
+                Z_j_term = get_term(i=N-j-1)
+                Z_ij_term = get_term(i=N-i-1) @ get_term(i=N-j-1)
+            return Q[i, j] / 4.0 * (I_term - Z_i_term - Z_j_term + Z_ij_term)
+        Z_i_term = get_term(i=i)
+        if i == j:
+            Z_ij_term = I_term
+            Z_j_term = Z_i_term
+        else:
+            Z_j_term = get_term(i=j)
+            Z_ij_term = get_term(i=i) @ get_term(i=j)
+        return Q[i, j] / 4.0 * (I_term - Z_i_term - Z_j_term + Z_ij_term)

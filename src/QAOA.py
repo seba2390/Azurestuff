@@ -1,4 +1,5 @@
 from typing import List, Tuple, Union
+from time import time
 
 from qiskit import QuantumCircuit, Aer, execute
 from qiskit.quantum_info import Operator
@@ -33,6 +34,7 @@ class QAOA:
         self.normalize_cost = normalize_cost
 
         self.counts = None
+        self.cost_time, self.circuit_time = 0.0, 0.0
 
     def set_circuit(self, angles):
 
@@ -82,10 +84,17 @@ class QAOA:
         return qcircuit
 
     def get_cost(self, angles) -> float:
+        __start__ = time()
         circuit = self.set_circuit(angles=angles)
         self.counts = execute(circuit, self.simulator).result().get_counts()
-        return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO_matrix) for
+        __end__ = time()
+        self.circuit_time += __end__ - __start__
+        __start__ = time()
+        cost = np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO_matrix) for
                         bitstring, probability in self.counts.items()])
+        __end__ = time()
+        self.cost_time += __end__ - __start__
+        return cost
 
         # Calculating cost this way slows down process (bigger matrix-vector products)
         """H_c = np.array(Operator(get_qiskit_H(Q=self.QUBO_matrix)))

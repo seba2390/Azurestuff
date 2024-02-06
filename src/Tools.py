@@ -420,36 +420,40 @@ def get_full_hamiltonian(indices: List[Tuple[int, int]], angles: List[float], N_
 def get_normal_H(Q: np.ndarray, flip: bool = False) -> np.ndarray:
     """ Generates H = \sum_ij q_ij(I_i-Z_i)/2(I_j-Z_j)/2
     If flip is True, the same convention for indexing as in Qiskit is assumed
-    where MSB is the right most qubit in a string.
+    where indexing is done right -> left in bitstring.
     """
-    I = identity(2, format='csr', dtype=np.float32)
+    format = 'csr'
+    single_idx_terms_cache = {}
+    I_term = identity(2 ** Q.shape[0], format=format, dtype=np.float32)
     Z = csr_matrix(np.array([[1, 0], [0, -1]], dtype=np.float32))
-    gate_map = {'Z': Z, 'I': I}
+
     def get_term(i: int):
         N = Q.shape[0]
-        if i == N - 1:
-            _mat_rep_ = gate_map['Z']
-            _after_I_ = identity(2 ** (N - 1), format='csr')
-            _mat_rep_ = kron(_mat_rep_, _after_I_)
-        else:
-            _before_I_ = identity(2 ** (N - i - 1), format='csr')
-            _mat_rep_ = kron(_before_I_, gate_map['Z'])
-            _after_I_ = identity(2 ** i, format='csr')
-            _mat_rep_ = kron(_mat_rep_, _after_I_)
-        return csr_matrix(_mat_rep_)
+        if i not in list(single_idx_terms_cache.keys()):
+            if i == N - 1:
+                _mat_rep_ = Z
+                _after_I_ = identity(2 ** (N - 1), format=format)
+                _mat_rep_ = kron(_mat_rep_, _after_I_)
+            else:
+                _before_I_ = identity(2 ** (N - i - 1), format=format)
+                _mat_rep_ = kron(_before_I_, Z)
+                _after_I_ = identity(2 ** i, format=format)
+                _mat_rep_ = kron(_mat_rep_, _after_I_)
+            single_idx_terms_cache[i] = csr_matrix(_mat_rep_)
+        return single_idx_terms_cache[i]
 
-    def get_ij_term(i: int, j: int, Q: np.ndarray) -> csc_matrix:
+    def get_ij_term(i: int, j: int, Q: np.ndarray) -> csr_matrix:
         N = Q.shape[0]
-        I_term = identity(2**Q.shape[0], format='csr', dtype=np.float32)
         if flip:
-            Z_i_term = get_term(i=N-i-1)
+            Z_i_term = get_term(i=N - i - 1)
             if i == j:
                 Z_ij_term = I_term
                 Z_j_term = Z_i_term
             else:
-                Z_j_term = get_term(i=N-j-1)
-                Z_ij_term = get_term(i=N-i-1) @ get_term(i=N-j-1)
+                Z_j_term = get_term(i=N - j - 1)
+                Z_ij_term = get_term(i=N - i - 1) @ get_term(i=N - j - 1)
             return Q[i, j] / 4.0 * (I_term - Z_i_term - Z_j_term + Z_ij_term)
+
         Z_i_term = get_term(i=i)
         if i == j:
             Z_ij_term = I_term
@@ -458,3 +462,9 @@ def get_normal_H(Q: np.ndarray, flip: bool = False) -> np.ndarray:
             Z_j_term = get_term(i=j)
             Z_ij_term = get_term(i=i) @ get_term(i=j)
         return Q[i, j] / 4.0 * (I_term - Z_i_term - Z_j_term + Z_ij_term)
+
+    H = csr_matrix(np.zeros(shape=(2 ** Q.shape[0], 2 ** Q.shape[1]), dtype=np.float32))
+    for i in range(Q.shape[0]):
+        for j in range(Q.shape[1]):
+            H += get_ij_term(i, j, Q)
+    return np.array(H.todense())

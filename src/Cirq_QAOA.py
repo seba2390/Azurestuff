@@ -22,6 +22,8 @@ class Cirq_QAOA:
         self.J_list, self.h_list = get_ising(Q=QUBO_matrix, offset=QUBO_offset)
 
         self.normalize_cost = normalize_cost
+        # Read bottom of page: https://quantumai.google/cirq/simulate/simulation
+        # and consider: https://github.com/quantumlib/qsim/blob/master/docs/tutorials/qsimcirq.ipynb
         self.simulator = cirq.Simulator()
 
         self.counts = None

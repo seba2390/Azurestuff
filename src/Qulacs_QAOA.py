@@ -1,15 +1,10 @@
-from typing import List, Tuple, Union
-from time import time
-import os
-
 import numpy as np
 
 from src.Tools import get_ising, qubo_cost, string_to_array
 
 from qulacs import QuantumCircuit
+from qulacs.circuit import QuantumCircuitOptimizer
 from qulacs.gate import RZ, RX, H, CNOT
-from qulacs import Observable
-from qulacs.state import inner_product
 from qulacs import QuantumState
 
 
@@ -19,9 +14,10 @@ class Qulacs_QAOA:
         self.layers = layers
         self.QUBO_matrix = QUBO_matrix
         self.J_list, self.h_list = get_ising(Q=QUBO_matrix, offset=QUBO_offset)
+        self.block_size = 2
+        self.optimizer = QuantumCircuitOptimizer()
 
         self.counts = None
-        self.cost_time, self.circuit_time = 0.0, 0.0
 
     @staticmethod
     def _int_to_fixed_length_binary_array_(number: int, num_bits: int) -> str:
@@ -61,6 +57,8 @@ class Qulacs_QAOA:
             for qubit_i in range(self.n_qubits):
                 qcircuit.add_gate(RX(index=qubit_i, angle=2 * beta[layer]))
 
+        # Optimize the circuit
+        #self.optimizer.optimize(qcircuit, self.block_size)
         return qcircuit
 
     def get_cost(self, angles):
@@ -69,11 +67,8 @@ class Qulacs_QAOA:
         circuit.update_quantum_state(state)
         state_vector = state.get_vector()
         self.counts = self.get_counts(state_vector=np.array(state_vector))
-        __start__ = time()
         cost = np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO_matrix) for
                         bitstring, probability in self.counts.items()])
-        __end__ = time()
-        self.cost_time += __end__ - __start__
         return cost
 
 

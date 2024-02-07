@@ -1,5 +1,6 @@
 from typing import List, Tuple, Union
 from time import time
+import os
 
 from qiskit import QuantumCircuit, Aer, execute
 from qiskit.quantum_info import Operator
@@ -25,6 +26,7 @@ class QAOA:
         self.QUBO_matrix = QUBO_matrix
         self.J_list, self.h_list = get_ising(Q=QUBO_matrix, offset=QUBO_offset)
         self.simulator = Aer.get_backend('statevector_simulator')
+        self.simulator.set_options(max_parallel_threads=os.cpu_count())
         self.constraining_mixer = constraining_mixer
         if constraining_mixer:
             if Topology is None:

@@ -1,7 +1,9 @@
+import os
 from typing import Sequence, Tuple, List
 from time import time
 
 import cirq
+import qsimcirq
 from cirq.ops.named_qubit import NamedQubit
 import sympy
 import numpy as np
@@ -9,7 +11,7 @@ import numpy as np
 from src.Tools import get_ising, qubo_cost, string_to_array
 
 
-class Cirq_QAOA:
+class Qsimcirq_QAOA:
     def __init__(self,
                  N_qubits,
                  layers,
@@ -24,7 +26,10 @@ class Cirq_QAOA:
         self.normalize_cost = normalize_cost
         # Read bottom of page: https://quantumai.google/cirq/simulate/simulation
         # and consider: https://github.com/quantumlib/qsim/blob/master/docs/tutorials/qsimcirq.ipynb
-        self.simulator = cirq.Simulator()
+        # and consider https://developer.nvidia.com/blog/accelerating-quantum-circuit-simulation-with-nvidia-custatevec/
+        options = qsimcirq.QSimOptions(max_fused_gate_size=3, cpu_threads=os.cpu_count())
+        self.simulator = qsimcirq.QSimSimulator()
+
         self.circuit = self.set_circuit()
         self.counts = None
         self.cost_time, self.circuit_time = 0.0, 0.0

@@ -7,6 +7,7 @@ from cirq.ops.named_qubit import NamedQubit
 import sympy
 import numpy as np
 
+from src.custom_cirq_gates import RXX, RYY
 from src.Tools import qubo_cost, string_to_array
 from src.Grid import Grid
 from src.Chain import Chain
@@ -96,30 +97,6 @@ class Cirq_CPQAOA:
         thetas = [sympy.Symbol(f"theta_{i}") for i in range(N_angles)]
         qubits = [cirq.NamedQubit(f'q_{i}') for i in range(self.n_qubits)]
 
-        def rxx(_circuit_:  cirq.circuits.circuit.Circuit,
-                angle: float,
-                qubit_1: NamedQubit,
-                qubit_2: NamedQubit):
-            _circuit_.append(cirq.H(qubit_1))
-            _circuit_.append(cirq.H(qubit_2))
-            _circuit_.append(cirq.CNOT(qubit_1, qubit_2))
-            _circuit_.append((cirq.rz(angle))(qubit_2))
-            _circuit_.append(cirq.CNOT(qubit_1, qubit_2))
-            _circuit_.append(cirq.H(qubit_1))
-            _circuit_.append(cirq.H(qubit_2))
-
-        def ryy(_circuit_:  cirq.circuits.circuit.Circuit,
-                angle: float,
-                qubit_1: NamedQubit,
-                qubit_2: NamedQubit):
-            _circuit_.append((cirq.rx(np.pi/2))(qubit_1))
-            _circuit_.append((cirq.rx(np.pi/2))(qubit_2))
-            _circuit_.append(cirq.CNOT(qubit_1, qubit_2))
-            _circuit_.append((cirq.rz(angle))(qubit_2))
-            _circuit_.append(cirq.CNOT(qubit_1, qubit_2))
-            _circuit_.append((cirq.rx(-np.pi/2))(qubit_1))
-            _circuit_.append((cirq.rx(-np.pi/2))(qubit_2))
-
         # Initial state: "k" excitations
         circuit = cirq.Circuit()
         for qubit_idx in self.initialization_strategy:
@@ -132,8 +109,8 @@ class Cirq_CPQAOA:
                 if self.approximate_hamiltonian:
                     q_i, q_j = qubits[qubit_i], qubits[qubit_j]
                     theta = thetas[angle_counter]
-                    rxx(_circuit_=circuit, angle=theta, qubit_1=q_i, qubit_2=q_j)
-                    ryy(_circuit_=circuit, angle=theta, qubit_1=q_i, qubit_2=q_j)
+                    circuit.append(RXX(theta=theta).on(q_i, q_j))
+                    circuit.append(RYY(theta=theta).on(q_i, q_j))
                     angle_counter += 1
 
         return circuit

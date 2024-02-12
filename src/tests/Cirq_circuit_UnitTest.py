@@ -8,7 +8,7 @@ from qiskit.quantum_info import Operator
 import cirq
 from scipy.linalg import expm
 
-from custom_cirq_gates import RXX, RYY
+from src.custom_cirq_gates import RXX, RYY
 
 
 def generate_unique_pairs(N, k):

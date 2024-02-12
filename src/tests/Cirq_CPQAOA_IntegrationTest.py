@@ -1,8 +1,8 @@
 from typing import List, Tuple, Dict
 import pytest
 import numpy as np
-from Chain import Chain
-from Cirq_CPQAOA import Cirq_CPQAOA
+from src.Chain import Chain
+from src.Cirq_CPQAOA import Cirq_CPQAOA
 
 
 def filter_small_probabilities(counts: dict[str, float], eps: float = 1e-10) -> dict[str, float]:

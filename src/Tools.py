@@ -17,10 +17,9 @@ from src.TorchQcircuit import *
 ##########################################
 
 def string_to_array(string_rep: str) -> np.ndarray:
-    return np.array([int(bit) for bit in string_rep]).astype(np.float64)
+    return np.array([int(bit) for bit in string_rep]).astype(np.float32)
 
 
-@jit(nopython=True, cache=True)
 def qubo_cost(state: np.ndarray, QUBO_matrix: np.ndarray) -> float:
     return np.dot(state, np.dot(QUBO_matrix, state))
 

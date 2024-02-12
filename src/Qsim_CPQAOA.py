@@ -1,8 +1,10 @@
 from typing import Sequence, Tuple, List, Union
 from itertools import combinations
 from time import time
+import os
 
 import cirq
+import qsimcirq
 from cirq.ops.named_qubit import NamedQubit
 import sympy
 import numpy as np
@@ -13,7 +15,7 @@ from src.Grid import Grid
 from src.Chain import Chain
 
 
-class Cirq_CPQAOA:
+class Qsim_CPQAOA:
     def __init__(self,
                  N_qubits,
                  cardinality,
@@ -55,7 +57,8 @@ class Cirq_CPQAOA:
 
         # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None
-        self.simulator = cirq.Simulator()
+        options = qsimcirq.QSimOptions(max_fused_gate_size=3, cpu_threads=os.cpu_count())
+        self.simulator = qsimcirq.QSimSimulator(options)
         self.circuit = self.set_circuit()
         self.cost_time, self.circuit_time = 0.0, 0.0
 
@@ -132,10 +135,7 @@ class Cirq_CPQAOA:
             probabilities = np.power(np.abs(self.simulator.compute_amplitudes(program=self.circuit,
                                                                               param_resolver=params,
                                                                               bitstrings=self.states_ints)), 2)
-
-            self.counts = self.filter_small_probabilities({self.states_strings[i]: probabilities[i]
-                                                           for i in range(len(probabilities))})
-
+            self.counts = self.filter_small_probabilities({self.states_strings[i]: probabilities[i] for i in range(len(probabilities))})
         cost = np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
                         bitstring, probability in self.counts.items()])
         return cost

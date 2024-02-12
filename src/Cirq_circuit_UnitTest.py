@@ -35,23 +35,28 @@ def generate_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, np.nd
     qubits = [cirq.NamedQubit(f'q_{i}') for i in range(__N_QUBITS__)]
     for seed in range(nr_rng_trials):
         # --- Generating random settings for instance --- #
-        rotation_angles = np.random.uniform(-2 * np.pi, 2 * np.pi, __N_TERMS__)
         initialization_strategy = np.random.choice(__N_QUBITS__, __k__, replace=False)
         qubit_pairs = generate_unique_pairs(N=__N_QUBITS__, k=__N_TERMS__)
+        if (0, __N_QUBITS__) not in qubit_pairs:
+            qubit_pairs.append((0, __N_QUBITS__-1))
+        rotation_angles = np.random.uniform(-2 * np.pi, 2 * np.pi, len(qubit_pairs))
 
         # ----- Cirq ----- #
         cirq_circuit = cirq.Circuit()
         for qubit_idx in initialization_strategy:
+            # Counting backwards to match Qiskit convention
+            qubit_idx = __N_QUBITS__ - qubit_idx - 1
             cirq_circuit.append(cirq.X(qubits[qubit_idx]))
         angle_counter = 0
         for (q_i, q_j) in qubit_pairs:
+            # Counting backwards to match Qiskit convention
+            q_i, q_j = __N_QUBITS__ - q_i - 1, __N_QUBITS__ - q_j - 1
             theta = rotation_angles[angle_counter]
-            cirq_circuit.append(RXX(theta=theta).on(qubits[q_i], qubits[q_j]))
-            cirq_circuit.append(RYY(theta=theta).on(qubits[q_i], qubits[q_j]))
+            RXX(circuit=cirq_circuit, angle=theta, qubit_1=qubits[q_i], qubit_2=qubits[q_j])
+            RYY(circuit=cirq_circuit, angle=theta, qubit_1=qubits[q_i], qubit_2=qubits[q_j])
             angle_counter += 1
         cirq_simulator = cirq.Simulator()
-        # Using qubit_order=reversed(qubits) to match Qiskit convention
-        cirq_state_vector = cirq_simulator.simulate(cirq_circuit, qubit_order=reversed(qubits)).final_state_vector
+        cirq_state_vector = cirq_simulator.simulate(cirq_circuit).final_state_vector
         cirq_probs = np.abs(cirq_state_vector) ** 2
 
         # ----- Qiskit ----- #
@@ -80,7 +85,7 @@ test_cases = generate_test_cases(nr_rng_trials=N_RNG_TRIALS)
 
 
 @pytest.mark.parametrize('vector_1, vector_2', test_cases, )
-def test_rxx_gate(vector_1: np.ndarray,
-                  vector_2: np.ndarray):
+def test_statevector(vector_1: np.ndarray,
+                     vector_2: np.ndarray):
     # Comparing
     assert np.allclose(vector_1, vector_2)

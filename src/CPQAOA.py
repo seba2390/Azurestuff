@@ -42,8 +42,8 @@ class CP_QAOA:
         self.n_qubits = N_qubits
         self.cardinality = cardinality
         self.layers = layers
-        self.Q = QUBO_matrix
-        self.O = create_operator(Q=self.Q)
+        self.Q = QUBO_matrix.astype(np.float32)
+        # self.O = create_operator(Q=self.Q)
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
         self.with_z_phase = with_z_phase
         self.approximate_hamiltonian = approximate_hamiltonian

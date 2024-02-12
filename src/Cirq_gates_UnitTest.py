@@ -23,7 +23,7 @@ def generate_rxx_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, n
         U_1 = expm(-1j * theta / 2 * circuit_1.unitary())
 
         circuit_2 = cirq.Circuit()
-        circuit_2.append(RXX(theta).on(qubits[0], qubits[1]))
+        RXX(circuit=circuit_2, angle=theta, qubit_1=qubits[0], qubit_2=qubits[1])
         U_2 = circuit_2.unitary()
 
         test_cases.append((U_1, U_2))
@@ -42,7 +42,7 @@ def generate_ryy_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, n
         U_1 = expm(-1j * theta / 2 * circuit_1.unitary())
 
         circuit_2 = cirq.Circuit()
-        circuit_2.append(RYY(theta).on(qubits[0], qubits[1]))
+        RYY(circuit=circuit_2, angle=theta, qubit_1=qubits[0], qubit_2=qubits[1])
         U_2 = circuit_2.unitary()
 
         test_cases.append((U_1, U_2))

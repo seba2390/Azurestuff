@@ -14,6 +14,7 @@ from src.custom_qulacs_gates import RXX, RYY
 
 __N__ = 5
 
+
 def generate_rxx_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, np.ndarray]]:
     test_cases = []
     for seed in range(nr_rng_trials):

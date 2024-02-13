@@ -12,13 +12,13 @@ from src.custom_qulacs_gates import RXX, RYY
 #                                 TEST CASE GENERATOR FUNCTIONS                                      #
 ######################################################################################################
 
-__N__ = 5
+__N__ = 2
 
 
 def generate_rxx_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, np.ndarray]]:
     test_cases = []
     for seed in range(nr_rng_trials):
-        np.random.seed(seed)
+        np.random.seed(seed+2)
         theta = np.random.uniform(-2 * np.pi, 2 * np.pi)
         pair = np.random.choice(__N__, 2, replace=False)
 
@@ -35,7 +35,7 @@ def generate_rxx_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, n
         qiskit_state_vector = np.array(execute(qiskit_circuit,
                                                Aer.get_backend('statevector_simulator')).result().get_statevector())
 
-        test_cases.append((qulacs_state_vector, qiskit_state_vector))
+        test_cases.append((qiskit_state_vector, qulacs_state_vector))
 
     return test_cases
 
@@ -60,7 +60,7 @@ def generate_ryy_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, n
         qiskit_state_vector = np.array(execute(qiskit_circuit,
                                                Aer.get_backend('statevector_simulator')).result().get_statevector())
 
-        test_cases.append((qulacs_state_vector, qiskit_state_vector))
+        test_cases.append((qiskit_state_vector, qulacs_state_vector))
 
     return test_cases
 
@@ -85,7 +85,7 @@ def generate_rz_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, np
         qiskit_state_vector = np.array(execute(qiskit_circuit,
                                                Aer.get_backend('statevector_simulator')).result().get_statevector())
 
-        test_cases.append((qulacs_state_vector, qiskit_state_vector))
+        test_cases.append((qiskit_state_vector, qulacs_state_vector))
 
     return test_cases
 

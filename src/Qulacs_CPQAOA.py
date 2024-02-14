@@ -48,7 +48,8 @@ class Qulacs_CPQAOA:
 
         self.block_size = 2
         self.optimizer = qulacs.circuit.QuantumCircuitOptimizer()
-        self.circuit = None
+        __dummy_angles__ = np.random.uniform(-2*np.pi,2*np.pi,self.layers*len(self.qubit_indices))
+        self.circuit = self.set_circuit(angles=__dummy_angles__)
         # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None
 
@@ -100,16 +101,12 @@ class Qulacs_CPQAOA:
 
     def get_cost(self, angles):
         if self.use_parametric_circuit_opt:
-            # if first call - create parametric QC, optimize gates.
-            if self.circuit is None:
-                self.circuit = self.set_circuit(angles)
-            else:
-                idx_counter = 0
-                for theta_i in angles:
-                    # Same angle for both Rxx and Ryy
-                    self.circuit.set_parameter(index=idx_counter, parameter=theta_i)
-                    self.circuit.set_parameter(index=idx_counter+1, parameter=theta_i)
-                    idx_counter += 2
+            idx_counter = 0
+            for theta_i in angles:
+                # Same angle for both Rxx and Ryy
+                self.circuit.set_parameter(index=idx_counter, parameter=theta_i)
+                self.circuit.set_parameter(index=idx_counter+1, parameter=theta_i)
+                idx_counter += 2
         else:
             self.circuit = self.set_circuit(angles)
         state = QuantumState(self.n_qubits)

@@ -2,8 +2,8 @@ from typing import List, Tuple, Dict
 import pytest
 import numpy as np
 from src.Chain import Chain
-from src.Qsim_CPQAOA import Qsim_CPQAOA
-from src.CPQAOA import CP_QAOA
+from src.Qsim_CP_VQA import Qsim_CPQAOA
+from src.Qiskit_CP_VQA import CP_QAOA
 
 
 def filter_small_probabilities(counts: dict[str, float], eps: float = 9.5e-13) -> dict[str, float]:

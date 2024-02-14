@@ -1,21 +1,20 @@
-from typing import Sequence, Tuple, List, Union
+from typing import Union, List
 from itertools import combinations
-from time import time
-import os
 
-import cirq
-import qsimcirq
-from cirq.ops.named_qubit import NamedQubit
-import sympy
 import numpy as np
+import qulacs.circuit
 
-from src.custom_cirq_gates import RXX, RYY
+from qulacs import QuantumCircuit, ParametricQuantumCircuit
+from qulacs.gate import X
+from qulacs import QuantumState
+
 from src.Tools import qubo_cost, string_to_array
-from src.Grid import Grid
+from src.custom_qulacs_gates import RXX, RYY, parametric_RXX, parametric_RYY
 from src.Chain import Chain
+from src.Grid import Grid
 
 
-class Qsim_CPQAOA:
+class Qulacs_CP_VQA:
     def __init__(self,
                  N_qubits,
                  cardinality,
@@ -23,22 +22,20 @@ class Qsim_CPQAOA:
                  QUBO_matrix,
                  topology: Union[Grid, Chain],
                  get_full_state_vector: bool = True,
-                 with_z_phase: bool = False,
+                 use_parametric_circuit_opt: bool = True,
                  with_next_nearest_neighbors: bool = False,
                  approximate_hamiltonian: bool = True):
 
         if not approximate_hamiltonian:
             raise ValueError('Exact Hamiltonian not implemented yet...')
         self.approximate_hamiltonian = approximate_hamiltonian
-        if with_z_phase:
-            raise ValueError('with z-phase not implemented yet...')
-        self.with_z_phase = with_z_phase
-        self.get_full_state_vector = get_full_state_vector
         self.n_qubits = N_qubits
         self.cardinality = cardinality
         self.layers = layers
         self.Q = QUBO_matrix.astype(np.float32)
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
+        self.use_parametric_circuit_opt = use_parametric_circuit_opt
+        self.get_full_state_vector = get_full_state_vector
 
         if topology.N_qubits != self.n_qubits:
             raise ValueError(f'provided topology consists of different number of qubits that provided for this ansatz.')
@@ -52,15 +49,14 @@ class Qsim_CPQAOA:
         # Indices to iterate over
         self.qubit_indices = self.next_nearest_neighbor_pairs if self.with_next_nearest_neighbors else self.nearest_neighbor_pairs
 
-        self.states_strings = self.generate_bit_strings(N=self.n_qubits, k=self.cardinality)
-        self.states_ints = [int(string, 2) for string in self.states_strings]
-
+        self.block_size = 2
+        self.optimizer = qulacs.circuit.QuantumCircuitOptimizer()
+        __dummy_angles__ = np.random.uniform(-2*np.pi, 2*np.pi, self.layers*len(self.qubit_indices))
+        self.circuit = self.set_circuit(angles=__dummy_angles__)
         # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None
-        options = qsimcirq.QSimOptions(max_fused_gate_size=3, cpu_threads=os.cpu_count())
-        self.simulator = qsimcirq.QSimSimulator(options)
-        self.circuit = self.set_circuit()
-        self.cost_time, self.circuit_time = 0.0, 0.0
+        self.states_strings = self.generate_bit_strings(N=self.n_qubits, k=self.cardinality)
+        self.states_ints = [int(string, 2) for string in self.states_strings]
 
     @staticmethod
     def generate_bit_strings(N, k) -> List[str]:
@@ -79,9 +75,8 @@ class Qsim_CPQAOA:
             bit_string = ['0'] * N
             for pos in positions:
                 bit_string[pos] = '1'
-            bit_strings.append(''.join(bit_string))
+            bit_strings.append(''.join(bit_string)[::-1])
         return bit_strings
-
     @staticmethod
     def filter_small_probabilities(counts: dict[str, float], eps: float = 9e-15) -> dict[str, float]:
         return {state: prob for state, prob in counts.items() if prob >= eps}
@@ -98,50 +93,54 @@ class Qsim_CPQAOA:
         return {self._int_to_fixed_length_binary_array_(number=idx, num_bits=n_qubits): np.abs(state_vector[idx]) ** 2
                 for idx in range(len(state_vector))}
 
-    def set_circuit(self):
+    def set_circuit(self, angles):
 
-        N_angles = len(self.qubit_indices) * self.layers
-        thetas = [sympy.Symbol(f"theta_{i}") for i in range(N_angles)]
-        qubits = [cirq.NamedQubit(f'q_{i}') for i in range(self.n_qubits)]
+        if self.use_parametric_circuit_opt:
+            qcircuit = ParametricQuantumCircuit(self.n_qubits)
+        else:
+            qcircuit = QuantumCircuit(self.n_qubits)
 
-        # Initial state: "k" excitations
-        circuit = cirq.Circuit()
+        # Initial state: 'k' excitations
         for qubit_idx in self.initialization_strategy:
-            # Counting backwards to match Qiskit convention
-            qubit_idx = self.n_qubits - qubit_idx - 1
-            circuit.append(cirq.X(qubits[qubit_idx]))
+            qcircuit.add_gate(X(index=qubit_idx))
 
         # Layered Ansatz
         angle_counter = 0
         for layer in range(self.layers):
             for qubit_i, qubit_j in self.qubit_indices:
                 if self.approximate_hamiltonian:
-                    # Counting backwards to match Qiskit convention
-                    qubit_i, qubit_j = self.n_qubits - qubit_i - 1, self.n_qubits - qubit_j - 1
-                    q_i, q_j = qubits[qubit_i], qubits[qubit_j]
-                    theta = thetas[angle_counter]
-                    RXX(circuit=circuit, angle=theta, qubit_1=q_i, qubit_2=q_j)
-                    RYY(circuit=circuit, angle=theta, qubit_1=q_i, qubit_2=q_j)
+                    theta = angles[angle_counter]
+                    if self.use_parametric_circuit_opt:
+                        parametric_RXX(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
+                        parametric_RYY(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
+                    else:
+                        RXX(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
+                        RYY(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
                     angle_counter += 1
 
-        return circuit
+        if self.use_parametric_circuit_opt:
+            # Optimize the circuit (reduce nr. of gates)
+            self.optimizer.optimize(circuit=qcircuit, block_size=self.block_size)
+        return qcircuit
 
-    def get_cost(self, angles) -> float:
-        params = cirq.ParamResolver(param_dict={f"theta_{i}": angles[i] for i in range(len(angles))})
+    def get_cost(self, angles):
+        if self.use_parametric_circuit_opt:
+            idx_counter = 0
+            for theta_i in angles:
+                # Same angle for both Rxx and Ryy
+                self.circuit.set_parameter(index=idx_counter, parameter=theta_i)
+                self.circuit.set_parameter(index=idx_counter+1, parameter=theta_i)
+                idx_counter += 2
+        else:
+            self.circuit = self.set_circuit(angles)
+        state = QuantumState(self.n_qubits)
+        self.circuit.update_quantum_state(state)
         if self.get_full_state_vector:
-            state_vector = self.simulator.simulate(program=self.circuit, param_resolver=params).final_state_vector
+            state_vector = state.get_vector()
             self.counts = self.filter_small_probabilities(self.get_counts(state_vector=np.array(state_vector)))
         else:
-            probabilities = np.power(np.abs(self.simulator.compute_amplitudes(program=self.circuit,
-                                                                              param_resolver=params,
-                                                                              bitstrings=self.states_ints)), 2)
+            probabilities = np.array([np.abs(state.get_amplitude(comp_basis=s))**2 for s in self.states_ints], dtype=np.float32)
             self.counts = self.filter_small_probabilities({self.states_strings[i]: probabilities[i] for i in range(len(probabilities))})
         cost = np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
                         bitstring, probability in self.counts.items()])
         return cost
-
-    def get_state_probabilities(self, flip_states: bool = True) -> dict:
-        counts = self.counts
-        if flip_states:
-            return {bitstring[::-1]: probability for bitstring, probability in counts.items()}
-        return {bitstring[::-1]: probability for bitstring, probability in counts.items()}

@@ -11,14 +11,13 @@ def RXX(circuit: qulacs.QuantumCircuit,
         angle: float,
         qubit_1: int,
         qubit_2: int,
-        use_native: bool = False):
+        use_native: bool = True):
     if use_native:
-        angle *= -1
         target_list = [qubit_2, qubit_1]
         pauli_index = [1, 1]  # 1:X , 2:Y, 3:Z
         circuit.add_gate(PauliRotation(index_list=target_list,
                                        pauli_ids=pauli_index,
-                                       angle=2 * angle))
+                                       angle=-angle))
     else:
         circuit.add_gate(H(index=qubit_1))
         circuit.add_gate(H(index=qubit_2))
@@ -33,14 +32,13 @@ def RYY(circuit: qulacs.QuantumCircuit,
         angle: float,
         qubit_1: int,
         qubit_2: int,
-        use_native: bool = False):
+        use_native: bool = True):
     if use_native:
-        angle *= -1
         target_list = [qubit_2, qubit_1]
         pauli_index = [2, 2]  # 1:X , 2:Y, 3:Z
         circuit.add_gate(PauliRotation(index_list=target_list,
                                        pauli_ids=pauli_index,
-                                       angle=2 * angle))
+                                       angle=-angle))
     else:
         circuit.add_gate(RX(index=qubit_1, angle=-np.pi / 2))
         circuit.add_gate(RX(index=qubit_2, angle=-np.pi / 2))

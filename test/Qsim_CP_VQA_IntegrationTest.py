@@ -2,8 +2,8 @@ from typing import List, Tuple, Dict
 import pytest
 import numpy as np
 from src.Chain import Chain
-from src.Qsim_CPQAOA import Qsim_CPQAOA
-from src.CPQAOA import CP_QAOA
+from src.Qsim_CP_VQA import Qsim_CP_VQA
+from src.Qiskit_CP_VQA import CP_VQA
 
 
 def filter_small_probabilities(counts: dict[str, float], eps: float = 9.5e-13) -> dict[str, float]:
@@ -30,7 +30,7 @@ def generate_count_test_cases(nr_rng_trials: int) -> List[Tuple[Dict[str, float]
                 angles = np.random.uniform(-2 * np.pi, 2 * np.pi, layers * len(topology.get_NN_indices()))
                 Q = np.random.uniform(0, 1, (N, N))
                 Q = (Q + Q.T) / 2.0
-                Qsim_ansatz = Qsim_CPQAOA(N_qubits=N,
+                Qsim_ansatz = Qsim_CP_VQA(N_qubits=N,
                                               cardinality=k,
                                               layers=layers,
                                               topology=topology,
@@ -38,7 +38,7 @@ def generate_count_test_cases(nr_rng_trials: int) -> List[Tuple[Dict[str, float]
                                               approximate_hamiltonian=True)
                 Qsim_ansatz.get_cost(angles=angles)
 
-                Qiskit_ansatz = CP_QAOA(N_qubits=N,
+                Qiskit_ansatz = CP_VQA(N_qubits=N,
                                         cardinality=k,
                                         layers=layers,
                                         topology=topology,

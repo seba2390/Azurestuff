@@ -2,8 +2,8 @@ from typing import List, Tuple, Dict
 import pytest
 import numpy as np
 from src.Chain import Chain
-from src.Qulacs_CPQAOA import Qulacs_CPQAOA
-from src.CPQAOA import CP_QAOA
+from src.Qulacs_CP_VQA import Qulacs_CP_VQA
+from src.Qiskit_CP_VQA import CP_VQA
 
 
 def filter_small_probabilities(counts: dict[str, float], eps: float = 9.5e-15) -> dict[str, float]:
@@ -30,7 +30,7 @@ def generate_count_test_cases(nr_rng_trials: int, use_param_circuit_opt: bool, g
                 angles = np.random.uniform(-2 * np.pi, 2 * np.pi, layers * len(topology.get_NN_indices()))
                 Q = np.random.uniform(0, 1, (N, N))
                 Q = (Q + Q.T) / 2.0
-                Qulacs_ansatz = Qulacs_CPQAOA(N_qubits=N,
+                Qulacs_ansatz = Qulacs_CP_VQA(N_qubits=N,
                                               cardinality=k,
                                               layers=layers,
                                               topology=topology,
@@ -40,7 +40,7 @@ def generate_count_test_cases(nr_rng_trials: int, use_param_circuit_opt: bool, g
                                               approximate_hamiltonian=True)
                 Qulacs_ansatz.get_cost(angles=angles)
 
-                Qiskit_ansatz = CP_QAOA(N_qubits=N,
+                Qiskit_ansatz = CP_VQA(N_qubits=N,
                                         cardinality=k,
                                         layers=layers,
                                         topology=topology,
@@ -68,8 +68,8 @@ test_cases_4 = generate_count_test_cases(nr_rng_trials=N_RNG_TRIALS, use_param_c
 
 @pytest.mark.parametrize('qulacs_counts, qiskit_counts, cardinality', test_cases_1, )
 def test_probabilities_1(qulacs_counts: Dict[str, float],
-                       qiskit_counts: Dict[str, float],
-                       cardinality: int):
+                         qiskit_counts: Dict[str, float],
+                         cardinality: int):
 
     # Comparing probabilities of two approaches
     for state, probability in qiskit_counts.items():

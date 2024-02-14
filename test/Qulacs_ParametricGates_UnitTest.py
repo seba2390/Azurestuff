@@ -113,7 +113,7 @@ def test_rxx_gate(qiskit_state_vector: np.ndarray,
 
 @pytest.mark.parametrize('qiskit_state_vector, qulacs_state_vector', rxx_test_cases_2, )
 def test_rxx_gate_2(qiskit_state_vector: np.ndarray,
-                  qulacs_state_vector: np.ndarray):
+                    qulacs_state_vector: np.ndarray):
     # Comparing
     assert np.allclose(qiskit_state_vector, qulacs_state_vector)
 
@@ -127,7 +127,7 @@ def test_ryy_gate(qiskit_state_vector: np.ndarray,
 
 @pytest.mark.parametrize('qiskit_state_vector, qulacs_state_vector', ryy_test_cases_2, )
 def test_ryy_gate_2(qiskit_state_vector: np.ndarray,
-                  qulacs_state_vector: np.ndarray):
+                    qulacs_state_vector: np.ndarray):
     # Comparing
     assert np.allclose(qiskit_state_vector, qulacs_state_vector)
 

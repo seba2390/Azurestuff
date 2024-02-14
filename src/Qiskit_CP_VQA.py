@@ -1,25 +1,19 @@
-from typing import List, Dict, Union
+from typing import Dict, Union
 import random
 from collections import Counter
 
-import scipy.linalg
 from qiskit import QuantumCircuit, Aer, execute
-from qiskit.circuit import Parameter
-from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.quantum_info import Operator
+from qiskit.quantum_info import Operator, Statevector
 from scipy.linalg import expm
 import numpy as np
-import torch
 
-from src.Tools import get_qiskit_H
-from src.Tools import qubo_cost, string_to_array, create_operator, operator_expectation, get_generator
+from src.Tools import qubo_cost, string_to_array
 from src.Grid import Grid
 from src.Tools import get_full_hamiltonian
 from src.Chain import Chain
-from src.TorchQcircuit import *
 
 
-class CP_QAOA:
+class CP_VQA:
     def __init__(self,
                  N_qubits,
                  cardinality,
@@ -106,7 +100,8 @@ class CP_QAOA:
 
     def get_cost(self, angles) -> float:
         circuit = self.set_circuit(angles=angles)
-        self.counts = execute(circuit, self.simulator).result().get_counts()
+        self.counts = Statevector(circuit).probabilities_dict()
+        #self.counts = execute(circuit, self.simulator).result().get_counts()
         if self.backend == 'sample':
             # Extract states and corresponding probabilities
             state_strings = list(self.counts.keys())
@@ -119,68 +114,6 @@ class CP_QAOA:
             self.counts = {key: count / self.N_samples for key, count in sample_counts.items()}
         return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
                         bitstring, probability in self.counts.items()])
-
-        # Calculating cost this way slows down process (bigger matrix-vector products)
-        """H_c = np.array(Operator(get_qiskit_H(Q=self.Q)))
-        state_vector = np.array(execute(circuit, self.simulator).result().get_statevector()).flatten()
-        if self.normalize_cost:
-            return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector)))) / 2.0 ** self.n_qubits
-        else:
-            return float(np.real(np.dot(state_vector.conj(), np.dot(H_c, state_vector))))"""
-
-    def get_gradient(self, angles) -> np.ndarray:
-        """ Using parameter shift rule to calculate exact derivatives"""
-        torch_angles = torch.tensor(angles,
-                                    requires_grad=True)
-
-        # Defining circuit
-        qcirc = QuantumCircuit(self.n_qubits)
-        # Setting 'k' qubits to |1>
-        for qubit_index in self.initialization_strategy:
-            qcirc.x(qubit_index)
-        psi_0 = torch.tensor(np.array(execute(qcirc, self.simulator).result().get_statevector(),dtype=complex).flatten(),
-                             dtype=torch.complex128, requires_grad=True)
-        counter = 0
-        for layer in range(self.layers):
-            if self.approximate_hamiltonian:
-                # XX+YY terms
-                for (qubit_i, qubit_j) in self.qubit_indices:
-                    theta_ij = torch_angles[counter]
-                    rxx = create_Rxx_matrix(n_qubits=self.n_qubits, qubit_1=qubit_i, qubit_2=qubit_j, angle=theta_ij)
-                    ryy = create_Ryy_matrix(n_qubits=self.n_qubits, qubit_1=qubit_i, qubit_2=qubit_j, angle=theta_ij)
-                    psi_0 = torch.matmul(ryy, torch.matmul(rxx, psi_0))
-                    counter += 1
-
-                # Z terms
-                if self.with_z_phase:
-                    for qubit_i in range(self.n_qubits):
-                        theta_i = torch_angles[counter]
-                        rz = create_Rz_matrix(n_qubits=self.n_qubits, qubit=qubit_i, angle=theta_i)
-                        psi_0 = torch.matmul(rz, psi_0)
-                        counter += 1
-            else:
-                H = get_full_torch_hamiltonian(indices=self.qubit_indices,
-                                               angles=torch_angles[layer*len(angles)//self.layers:(layer+1)*len(angles)//self.layers],
-                                               N_qubits=self.n_qubits,
-                                               with_z_phase=self.with_z_phase)
-                time = 1.0
-                U = torch.matrix_exp(-1j * time * H)
-                psi_0 = torch.matmul(U, psi_0)
-
-        # Get cost hamiltonian
-        H_c = torch.tensor(np.array(Operator(get_qiskit_H(Q=self.Q))),
-                           dtype=torch.complex128,
-                           requires_grad=True)
-        if self.normalize_cost:
-            c = torch.real(torch.dot(torch.conj(psi_0), torch.matmul(H_c, psi_0))) / 2.0 ** self.n_qubits
-        else:
-            c = torch.real(torch.dot(torch.conj(psi_0), torch.matmul(H_c, psi_0)))
-        c.backward()
-
-        # Extracting and returning the gradient as a numpy array
-        angle_gradients = torch_angles.grad.numpy()
-
-        return angle_gradients
 
     def get_state_probabilities(self, flip_states: bool = True) -> Dict:
         counts = self.counts

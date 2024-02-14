@@ -1,12 +1,12 @@
 from typing import List, Tuple
 import random
+import os
 
 import pytest
 import numpy as np
 from qiskit import QuantumCircuit, Aer, execute
-from qiskit.quantum_info import Operator
 import cirq
-from scipy.linalg import expm
+import qsimcirq
 
 from src.custom_cirq_gates import RXX, RYY
 
@@ -55,7 +55,8 @@ def generate_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, np.nd
             RXX(circuit=cirq_circuit, angle=theta, qubit_1=qubits[q_i], qubit_2=qubits[q_j])
             RYY(circuit=cirq_circuit, angle=theta, qubit_1=qubits[q_i], qubit_2=qubits[q_j])
             angle_counter += 1
-        cirq_simulator = cirq.Simulator()
+        options = qsimcirq.QSimOptions(max_fused_gate_size=3, cpu_threads=os.cpu_count())
+        cirq_simulator = qsimcirq.QSimSimulator(options)
         cirq_state_vector = cirq_simulator.simulate(cirq_circuit).final_state_vector
         cirq_probs = np.abs(cirq_state_vector) ** 2
 

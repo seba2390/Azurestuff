@@ -4,7 +4,7 @@ import numpy as np
 
 # TODO: Find out why Qulacs single qubit rotation is opposite sign of qiskit??
 
-def RXX(circuit, angle, qubit_1, qubit_2, use_native: bool = True):
+def RXX(circuit, angle, qubit_1, qubit_2, use_native: bool = False):
     if use_native:
         angle *= -1
         target_list = [qubit_2, qubit_1]
@@ -21,7 +21,7 @@ def RXX(circuit, angle, qubit_1, qubit_2, use_native: bool = True):
     circuit.add_gate(H(index=qubit_2))
 
 
-def RYY(circuit, angle, qubit_1, qubit_2, use_native: bool = True):
+def RYY(circuit, angle, qubit_1, qubit_2, use_native: bool = False):
     if use_native:
         angle *= -1
         target_list = [qubit_2, qubit_1]

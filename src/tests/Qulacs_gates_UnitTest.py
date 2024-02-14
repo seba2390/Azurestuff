@@ -12,7 +12,7 @@ from src.custom_qulacs_gates import RXX, RYY
 #                                 TEST CASE GENERATOR FUNCTIONS                                      #
 ######################################################################################################
 
-__N__ = 2
+__N__ = 6
 
 
 def generate_rxx_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, np.ndarray]]:

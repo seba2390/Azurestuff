@@ -18,7 +18,7 @@ __N_VALUES__ = [3, 4, 5]
 __LAYER_VALUES__ = [1, 2, 3]
 
 
-def generate_count_test_cases(nr_rng_trials: int = 3) -> List[Tuple[Dict[str, float], Dict[str, float], int]]:
+def generate_count_test_cases(nr_rng_trials: int, use_param_circuit_opt: bool) -> List[Tuple[Dict[str, float], Dict[str, float], int]]:
     test_cases = []
     for seed in range(nr_rng_trials):
         np.random.seed(seed)
@@ -35,6 +35,7 @@ def generate_count_test_cases(nr_rng_trials: int = 3) -> List[Tuple[Dict[str, fl
                                               layers=layers,
                                               topology=topology,
                                               QUBO_matrix=Q,
+                                              use_parametric_circuit_opt=use_param_circuit_opt,
                                               approximate_hamiltonian=True)
                 Qulacs_ansatz.get_cost(angles=angles)
 
@@ -58,11 +59,12 @@ def generate_count_test_cases(nr_rng_trials: int = 3) -> List[Tuple[Dict[str, fl
 
 N_RNG_TRIALS = 3
 
-test_cases = generate_count_test_cases(nr_rng_trials=N_RNG_TRIALS)
+test_cases_1 = generate_count_test_cases(nr_rng_trials=N_RNG_TRIALS, use_param_circuit_opt=True)
+test_cases_2 = generate_count_test_cases(nr_rng_trials=N_RNG_TRIALS, use_param_circuit_opt=False)
 
 
-@pytest.mark.parametrize('qulacs_counts, qiskit_counts, cardinality', test_cases, )
-def test_probabilities(qulacs_counts: Dict[str, float],
+@pytest.mark.parametrize('qulacs_counts, qiskit_counts, cardinality', test_cases_1, )
+def test_probabilities_1(qulacs_counts: Dict[str, float],
                        qiskit_counts: Dict[str, float],
                        cardinality: int):
 
@@ -79,3 +81,21 @@ def test_probabilities(qulacs_counts: Dict[str, float],
     # Checking that all probability is included (should sum to approx. 1)
     assert np.isclose(sum([p for p in list(qulacs_counts.values())]), 1.0)
 
+
+@pytest.mark.parametrize('qulacs_counts, qiskit_counts, cardinality', test_cases_2, )
+def test_probabilities_2(qulacs_counts: Dict[str, float],
+                         qiskit_counts: Dict[str, float],
+                         cardinality: int):
+
+    # Comparing probabilities of two approaches
+    for state, probability in qiskit_counts.items():
+        # Comparing probabilities of two approaches
+        assert np.isclose(probability, qulacs_counts[state])
+
+    # Checking that cardinality is preserved
+    for state, probability in qulacs_counts.items():
+        # Checking that cardinality is preserved
+        assert sum([int(q_val) for q_val in state]) == cardinality
+
+    # Checking that all probability is included (should sum to approx. 1)
+    assert np.isclose(sum([p for p in list(qulacs_counts.values())]), 1.0)

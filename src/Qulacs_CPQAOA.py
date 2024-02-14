@@ -1,13 +1,14 @@
 from typing import Union
 
 import numpy as np
+import qulacs.circuit
 
-from qulacs import QuantumCircuit
+from qulacs import QuantumCircuit, ParametricQuantumCircuit
 from qulacs.gate import X
 from qulacs import QuantumState
 
 from src.Tools import get_ising, qubo_cost, string_to_array
-from src.custom_qulacs_gates import RXX, RYY
+from src.custom_qulacs_gates import RXX, RYY, parametric_RXX, parametric_RYY
 from src.Chain import Chain
 from src.Grid import Grid
 
@@ -19,6 +20,7 @@ class Qulacs_CPQAOA:
                  layers,
                  QUBO_matrix,
                  topology: Union[Grid, Chain],
+                 use_parametric_circuit_opt: bool = True,
                  with_next_nearest_neighbors: bool = False,
                  approximate_hamiltonian: bool = True):
 
@@ -30,6 +32,7 @@ class Qulacs_CPQAOA:
         self.layers = layers
         self.Q = QUBO_matrix.astype(np.float32)
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
+        self.use_parametric_circuit_opt = use_parametric_circuit_opt
 
         if topology.N_qubits != self.n_qubits:
             raise ValueError(f'provided topology consists of different number of qubits that provided for this ansatz.')
@@ -43,12 +46,16 @@ class Qulacs_CPQAOA:
         # Indices to iterate over
         self.qubit_indices = self.next_nearest_neighbor_pairs if self.with_next_nearest_neighbors else self.nearest_neighbor_pairs
 
+        self.block_size = 2
+        self.optimizer = qulacs.circuit.QuantumCircuitOptimizer()
+        self.circuit = None
         # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None
 
     @staticmethod
     def filter_small_probabilities(counts: dict[str, float], eps: float = 9e-15) -> dict[str, float]:
         return {state: prob for state, prob in counts.items() if prob >= eps}
+
     @staticmethod
     def _int_to_fixed_length_binary_array_(number: int, num_bits: int) -> str:
         # Convert the number to binary and remove the '0b' prefix
@@ -63,7 +70,10 @@ class Qulacs_CPQAOA:
 
     def set_circuit(self, angles):
 
-        qcircuit = QuantumCircuit(self.n_qubits)
+        if self.use_parametric_circuit_opt:
+            qcircuit = ParametricQuantumCircuit(self.n_qubits)
+        else:
+            qcircuit = QuantumCircuit(self.n_qubits)
 
         # Initial state: 'k' excitations
         for qubit_idx in self.initialization_strategy:
@@ -75,22 +85,37 @@ class Qulacs_CPQAOA:
             for qubit_i, qubit_j in self.qubit_indices:
                 if self.approximate_hamiltonian:
                     theta = angles[angle_counter]
-                    RXX(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j)
-                    RYY(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j)
+                    if self.use_parametric_circuit_opt:
+                        parametric_RXX(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j)
+                        parametric_RYY(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j)
+                    else:
+                        RXX(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j)
+                        RYY(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j)
                     angle_counter += 1
 
-        # Optimize the circuit
-        #self.optimizer.optimize(qcircuit, self.block_size)
+        if self.use_parametric_circuit_opt:
+            # Optimize the circuit (reduce nr. of gates)
+            self.optimizer.optimize(circuit=qcircuit, block_size=self.block_size)
         return qcircuit
 
     def get_cost(self, angles):
-        circuit = self.set_circuit(angles=angles)
+        if self.use_parametric_circuit_opt:
+            # if first call - create parametric QC, optimize gates.
+            if self.circuit is None:
+                self.circuit = self.set_circuit(angles)
+            else:
+                idx_counter = 0
+                for theta_i in angles:
+                    # Same angle for both Rxx and Ryy
+                    self.circuit.set_parameter(index=idx_counter, parameter=theta_i)
+                    self.circuit.set_parameter(index=idx_counter+1, parameter=theta_i)
+                    idx_counter += 2
+        else:
+            self.circuit = self.set_circuit(angles)
         state = QuantumState(self.n_qubits)
-        circuit.update_quantum_state(state)
+        self.circuit.update_quantum_state(state)
         state_vector = state.get_vector()
         self.counts = self.filter_small_probabilities(self.get_counts(state_vector=np.array(state_vector)))
         cost = np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
                         bitstring, probability in self.counts.items()])
         return cost
-
-

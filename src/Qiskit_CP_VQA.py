@@ -100,8 +100,7 @@ class CP_VQA:
 
     def get_cost(self, angles) -> float:
         circuit = self.set_circuit(angles=angles)
-        self.counts = Statevector(circuit).probabilities_dict()
-        #self.counts = execute(circuit, self.simulator).result().get_counts()
+        self.counts = execute(circuit, self.simulator).result().get_counts()
         if self.backend == 'sample':
             # Extract states and corresponding probabilities
             state_strings = list(self.counts.keys())

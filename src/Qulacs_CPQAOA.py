@@ -111,11 +111,11 @@ class Qulacs_CPQAOA:
                 if self.approximate_hamiltonian:
                     theta = angles[angle_counter]
                     if self.use_parametric_circuit_opt:
-                        parametric_RXX(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j)
-                        parametric_RYY(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j)
+                        parametric_RXX(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
+                        parametric_RYY(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
                     else:
-                        RXX(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j)
-                        RYY(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j)
+                        RXX(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
+                        RYY(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
                     angle_counter += 1
 
         if self.use_parametric_circuit_opt:

@@ -1,4 +1,5 @@
-from typing import Union
+from typing import Union, List
+from itertools import combinations
 
 import numpy as np
 import qulacs.circuit
@@ -20,6 +21,7 @@ class Qulacs_CPQAOA:
                  layers,
                  QUBO_matrix,
                  topology: Union[Grid, Chain],
+                 get_full_state_vector: bool = True,
                  use_parametric_circuit_opt: bool = True,
                  with_next_nearest_neighbors: bool = False,
                  approximate_hamiltonian: bool = True):
@@ -33,6 +35,7 @@ class Qulacs_CPQAOA:
         self.Q = QUBO_matrix.astype(np.float32)
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
         self.use_parametric_circuit_opt = use_parametric_circuit_opt
+        self.get_full_state_vector = get_full_state_vector
 
         if topology.N_qubits != self.n_qubits:
             raise ValueError(f'provided topology consists of different number of qubits that provided for this ansatz.')
@@ -48,11 +51,32 @@ class Qulacs_CPQAOA:
 
         self.block_size = 2
         self.optimizer = qulacs.circuit.QuantumCircuitOptimizer()
-        __dummy_angles__ = np.random.uniform(-2*np.pi,2*np.pi,self.layers*len(self.qubit_indices))
+        __dummy_angles__ = np.random.uniform(-2*np.pi, 2*np.pi, self.layers*len(self.qubit_indices))
         self.circuit = self.set_circuit(angles=__dummy_angles__)
         # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None
+        self.states_strings = self.generate_bit_strings(N=self.n_qubits, k=self.cardinality)
+        self.states_ints = [int(string, 2) for string in self.states_strings]
 
+    @staticmethod
+    def generate_bit_strings(N, k) -> List[str]:
+        """
+        Generate all bit strings of length N with k ones.
+
+        Parameters:
+        N (int): The length of the bit strings.
+        k (int): The number of ones in each bit string.
+
+        Returns:
+        List[str]: A list of all bit strings of length N with k ones.
+        """
+        bit_strings = []
+        for positions in combinations(range(N), k):
+            bit_string = ['0'] * N
+            for pos in positions:
+                bit_string[pos] = '1'
+            bit_strings.append(''.join(bit_string)[::-1])
+        return bit_strings
     @staticmethod
     def filter_small_probabilities(counts: dict[str, float], eps: float = 9e-15) -> dict[str, float]:
         return {state: prob for state, prob in counts.items() if prob >= eps}
@@ -111,8 +135,12 @@ class Qulacs_CPQAOA:
             self.circuit = self.set_circuit(angles)
         state = QuantumState(self.n_qubits)
         self.circuit.update_quantum_state(state)
-        state_vector = state.get_vector()
-        self.counts = self.filter_small_probabilities(self.get_counts(state_vector=np.array(state_vector)))
+        if self.get_full_state_vector:
+            state_vector = state.get_vector()
+            self.counts = self.filter_small_probabilities(self.get_counts(state_vector=np.array(state_vector)))
+        else:
+            probabilities = np.array([np.abs(state.get_amplitude(comp_basis=s))**2 for s in self.states_ints], dtype=np.float32)
+            self.counts = self.filter_small_probabilities({self.states_strings[i]: probabilities[i] for i in range(len(probabilities))})
         cost = np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
                         bitstring, probability in self.counts.items()])
         return cost

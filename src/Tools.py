@@ -16,6 +16,10 @@ def string_to_array(string_rep: str) -> np.ndarray:
     return np.array([int(bit) for bit in string_rep]).astype(np.float32)
 
 
+def array_to_string(array: np.ndarray) -> str:
+    return ''.join(str(int(bit)) for bit in array)
+
+
 def qubo_cost(state: np.ndarray, QUBO_matrix: np.ndarray) -> float:
     return np.dot(state, np.dot(QUBO_matrix, state))
 
@@ -53,33 +57,21 @@ def min_cost_partition(nr_qubits: int,
                        mu: np.ndarray,
                        sigma: np.ndarray,
                        alpha: float) -> Tuple[dict, dict, float]:
-    def generate_binary_combinations(n: int, k: int) -> np.ndarray:
-        """ Generates all the 'n' chose 'k' combinations w. 'k' ones. """
-        num_permutations = 2 ** n
-        for indices in combinations(range(n), k):
-            # Create a numpy array of zeros of size N
-            arr = np.zeros(n, dtype=int)
-            # Set ones at the specified positions
-            arr[list(indices)] = 1
-            yield arr
-
     max_cost_1, min_cost_1, min_comb = -np.inf, np.inf, np.empty(shape=(nr_qubits,))
-    for comb in generate_binary_combinations(n=nr_qubits, k=k):
-        comb_cost = portfolio_cost(state=comb, mu=mu, sigma=sigma, alpha=alpha)
-        if comb_cost < min_cost_1:
-            min_cost_1, min_comb = comb_cost, comb
-        if comb_cost > max_cost_1:
-            max_cost_1 = comb_cost
-    binary_comb = min_comb
-
     max_cost_2, min_cost_2, min_perm = -np.inf, np.inf, np.empty(shape=(nr_qubits,))
     for perm in generate_binary_permutations(n=nr_qubits):
-        perm_cost = portfolio_cost(state=perm, mu=mu, sigma=sigma, alpha=alpha)
-        if perm_cost < min_cost_2:
-            min_cost_2, min_perm = perm_cost, perm
-        if perm_cost > max_cost_2:
-            max_cost_2 = perm_cost
+        cost = portfolio_cost(state=perm, mu=mu, sigma=sigma, alpha=alpha)
+        if cost < min_cost_2:
+            min_cost_2, min_perm = cost, perm
+        if cost > max_cost_2:
+            max_cost_2 = cost
+        if np.sum(perm) == k:
+            if cost < min_cost_1:
+                min_cost_1, min_comb = cost, perm
+            if cost > max_cost_1:
+                max_cost_1 = cost
     binary_perm = min_perm
+    binary_comb = min_comb
 
     _lmbda_ = 0
     if min_cost_2 < min_cost_1:

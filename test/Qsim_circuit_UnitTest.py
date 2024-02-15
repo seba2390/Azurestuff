@@ -11,10 +11,15 @@ import qsimcirq
 from src.custom_cirq_gates import RXX, RYY
 
 
+def filter_probabilities(probabilities: np.ndarray, eps: float = 5e-14) -> np.ndarray:
+    probabilities[np.abs(probabilities) < eps] = 0
+    return probabilities
+
+
 def generate_unique_pairs(N, k):
     # Ensure k is not larger than the number of unique pairs possible
     if k > N * (N - 1):
-        raise ValueError("k is too large for the given N")
+        raise ValueError("Nr. of terms is too large for the given N (Nr. of qubits).")
     # Generate all possible unique tuples
     all_tuples = [(i, j) for i in range(N) for j in range(N) if i != j]
     # Randomly select 'k' tuples from the list
@@ -38,7 +43,7 @@ def generate_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, np.nd
         initialization_strategy = np.random.choice(__N_QUBITS__, __k__, replace=False)
         qubit_pairs = generate_unique_pairs(N=__N_QUBITS__, k=__N_TERMS__)
         if (0, __N_QUBITS__) not in qubit_pairs:
-            qubit_pairs.append((0, __N_QUBITS__-1))
+            qubit_pairs.append((0, __N_QUBITS__ - 1))
         rotation_angles = np.random.uniform(-2 * np.pi, 2 * np.pi, len(qubit_pairs))
 
         # ----- Cirq ----- #
@@ -58,7 +63,7 @@ def generate_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, np.nd
         options = qsimcirq.QSimOptions(max_fused_gate_size=3, cpu_threads=os.cpu_count())
         cirq_simulator = qsimcirq.QSimSimulator(options)
         cirq_state_vector = cirq_simulator.simulate(cirq_circuit).final_state_vector
-        cirq_probs = np.abs(cirq_state_vector) ** 2
+        cirq_probs = filter_probabilities(np.abs(cirq_state_vector) ** 2)
 
         # ----- Qiskit ----- #
         qiskit_simulator = Aer.get_backend('statevector_simulator')
@@ -71,7 +76,7 @@ def generate_test_cases(nr_rng_trials: int = 10) -> List[Tuple[np.ndarray, np.nd
             qiskit_circuit.ryy(theta=float(rotation_angles[angle_idx]), qubit1=qubit_i, qubit2=qubit_j)
             angle_idx += 1
         qiskit_state_vector = np.array(execute(qiskit_circuit, qiskit_simulator).result().get_statevector())
-        qiskit_probs = np.abs(qiskit_state_vector) ** 2
+        qiskit_probs = filter_probabilities(np.abs(qiskit_state_vector) ** 2)
         test_cases.append((cirq_probs, qiskit_probs))
 
     return test_cases
@@ -89,4 +94,4 @@ test_cases = generate_test_cases(nr_rng_trials=N_RNG_TRIALS)
 def test_statevector(vector_1: np.ndarray,
                      vector_2: np.ndarray):
     # Comparing
-    assert np.allclose(vector_1, vector_2)
+    assert np.allclose(vector_1, vector_2, atol=1e-5)

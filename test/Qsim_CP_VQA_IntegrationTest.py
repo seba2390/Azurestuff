@@ -4,6 +4,7 @@ import numpy as np
 from src.Chain import Chain
 from src.Qsim_CP_VQA import Qsim_CP_VQA
 from src.Qiskit_CP_VQA import CP_VQA
+from src.Qubo import Qubo
 
 
 def filter_small_probabilities(counts: dict[str, float], eps: float = 9.5e-13) -> dict[str, float]:
@@ -42,7 +43,7 @@ def generate_count_test_cases(nr_rng_trials: int) -> List[Tuple[Dict[str, float]
                                         cardinality=k,
                                         layers=layers,
                                         topology=topology,
-                                        QUBO_matrix=Q,
+                                        qubo=Qubo(Q=Q, offset=0),
                                         approximate_hamiltonian=True)
                 Qiskit_ansatz.get_cost(angles=angles)
 

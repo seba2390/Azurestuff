@@ -4,6 +4,7 @@ import numpy as np
 from src.Chain import Chain
 from src.Qulacs_CP_VQA import Qulacs_CP_VQA
 from src.Qiskit_CP_VQA import CP_VQA
+from src.Qubo import Qubo
 
 
 def filter_small_probabilities(counts: dict[str, float], eps: float = 9.5e-15) -> dict[str, float]:
@@ -18,7 +19,8 @@ __N_VALUES__ = [3, 4, 5]
 __LAYER_VALUES__ = [1, 2, 3]
 
 
-def generate_count_test_cases(nr_rng_trials: int, use_param_circuit_opt: bool, get_full_sv: bool) -> List[Tuple[Dict[str, float], Dict[str, float], int]]:
+def generate_count_test_cases(nr_rng_trials: int, use_param_circuit_opt: bool, get_full_sv: bool) -> List[
+    Tuple[Dict[str, float], Dict[str, float], int]]:
     test_cases = []
     for seed in range(nr_rng_trials):
         np.random.seed(seed)
@@ -41,11 +43,11 @@ def generate_count_test_cases(nr_rng_trials: int, use_param_circuit_opt: bool, g
                 Qulacs_ansatz.get_cost(angles=angles)
 
                 Qiskit_ansatz = CP_VQA(N_qubits=N,
-                                        cardinality=k,
-                                        layers=layers,
-                                        topology=topology,
-                                        QUBO_matrix=Q,
-                                        approximate_hamiltonian=True)
+                                       cardinality=k,
+                                       layers=layers,
+                                       topology=topology,
+                                       qubo=Qubo(Q=Q, offset=0.0),
+                                       approximate_hamiltonian=True)
                 Qiskit_ansatz.get_cost(angles=angles)
 
                 test_cases.append((filter_small_probabilities(Qulacs_ansatz.counts),
@@ -70,7 +72,6 @@ test_cases_4 = generate_count_test_cases(nr_rng_trials=N_RNG_TRIALS, use_param_c
 def test_probabilities_1(qulacs_counts: Dict[str, float],
                          qiskit_counts: Dict[str, float],
                          cardinality: int):
-
     # Comparing probabilities of two approaches
     for state, probability in qiskit_counts.items():
         # Comparing probabilities of two approaches
@@ -89,7 +90,6 @@ def test_probabilities_1(qulacs_counts: Dict[str, float],
 def test_probabilities_2(qulacs_counts: Dict[str, float],
                          qiskit_counts: Dict[str, float],
                          cardinality: int):
-
     # Comparing probabilities of two approaches
     for state, probability in qiskit_counts.items():
         # Comparing probabilities of two approaches
@@ -108,7 +108,6 @@ def test_probabilities_2(qulacs_counts: Dict[str, float],
 def test_probabilities_3(qulacs_counts: Dict[str, float],
                          qiskit_counts: Dict[str, float],
                          cardinality: int):
-
     # Comparing probabilities of two approaches
     for state, probability in qiskit_counts.items():
         # Comparing probabilities of two approaches
@@ -127,7 +126,6 @@ def test_probabilities_3(qulacs_counts: Dict[str, float],
 def test_probabilities_4(qulacs_counts: Dict[str, float],
                          qiskit_counts: Dict[str, float],
                          cardinality: int):
-
     # Comparing probabilities of two approaches
     for state, probability in qiskit_counts.items():
         # Comparing probabilities of two approaches

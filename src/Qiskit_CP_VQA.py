@@ -7,10 +7,14 @@ from qiskit.quantum_info import Operator
 from scipy.linalg import expm
 import numpy as np
 
-from src.Tools import qubo_cost, string_to_array
+from src.Tools import (qubo_cost,
+                       string_to_array,
+                       array_to_string,
+                       normalized_cost)
 from src.Grid import Grid
 from src.Tools import get_full_hamiltonian
 from src.Chain import Chain
+from src.Qubo import Qubo
 
 
 class CP_VQA:
@@ -18,7 +22,7 @@ class CP_VQA:
                  N_qubits,
                  cardinality,
                  layers,
-                 QUBO_matrix,
+                 qubo: Qubo,
                  topology: Union[Grid, Chain],
                  with_z_phase: bool = False,
                  with_next_nearest_neighbors: bool = False,
@@ -36,7 +40,8 @@ class CP_VQA:
         self.n_qubits = N_qubits
         self.cardinality = cardinality
         self.layers = layers
-        self.Q = QUBO_matrix.astype(np.float32)
+        self.QUBO = qubo
+
         # self.O = create_operator(Q=self.Q)
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
         self.with_z_phase = with_z_phase
@@ -58,6 +63,8 @@ class CP_VQA:
 
         # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None
+        self.normalized_costs = []
+        self.opt_state_probabilities = []
 
         if backend not in ['state_vector', 'sample']:
             raise ValueError(f'provided backend should be either "state_vector" or "sample"')
@@ -90,11 +97,12 @@ class CP_VQA:
                         qcircuit.rz(phi=next(__angles__), qubit=qubit_i)
             else:
                 H = get_full_hamiltonian(indices=self.qubit_indices,
-                                         angles=angles[layer*len(angles)//self.layers:(layer+1)*len(angles)//self.layers],
+                                         angles=angles[layer * len(angles) // self.layers:(layer + 1) * len(
+                                             angles) // self.layers],
                                          N_qubits=self.n_qubits,
                                          with_z_phase=self.with_z_phase)
                 time = 1.0
-                U_H = Operator(expm(-1j*time*H.data))
+                U_H = Operator(expm(-1j * time * H.data))
                 qcircuit.append(U_H, list(range(self.n_qubits)))
         return qcircuit
 
@@ -111,8 +119,22 @@ class CP_VQA:
             sample_counts = Counter(samples)
             # Convert counts to probabilities
             self.counts = {key: count / self.N_samples for key, count in sample_counts.items()}
-        return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.Q) for
+        return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO.Q) for
                         bitstring, probability in self.counts.items()])
+
+    def callback(self):
+        probability_dict = self.get_state_probabilities(flip_states=False)
+        normalized_c = normalized_cost(result=probability_dict,
+                                       QUBO_matrix=self.QUBO.Q,
+                                       QUBO_offset=self.QUBO.offset,
+                                       max_cost=self.QUBO.subspace_c_max,
+                                       min_cost=self.QUBO.subspace_c_min)
+        self.normalized_costs.append(normalized_c)
+        x_min_str = array_to_string(array=self.QUBO.subspace_x_min)
+        if x_min_str in list(probability_dict.keys()):
+            self.opt_state_probabilities.append(probability_dict[x_min_str])
+        else:
+            self.opt_state_probabilities.append(0)
 
     def get_state_probabilities(self, flip_states: bool = True) -> Dict:
         counts = self.counts

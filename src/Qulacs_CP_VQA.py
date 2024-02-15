@@ -129,6 +129,20 @@ class Qulacs_CP_VQA:
             self.optimizer.optimize(circuit=qcircuit, block_size=self.block_size)
         return qcircuit
 
+    def get_statevector(self, angles):
+        if self.use_parametric_circuit_opt:
+            idx_counter = 0
+            for theta_i in angles:
+                # Same angle for both Rxx and Ryy
+                self.circuit.set_parameter(index=idx_counter, parameter=theta_i)
+                self.circuit.set_parameter(index=idx_counter + 1, parameter=theta_i)
+                idx_counter += 2
+        else:
+            self.circuit = self.set_circuit(angles)
+        state = QuantumState(self.n_qubits)
+        self.circuit.update_quantum_state(state)
+        return np.array(state.get_vector())
+
     def get_cost(self, angles):
         if self.use_parametric_circuit_opt:
             idx_counter = 0

@@ -146,11 +146,35 @@ class Qulacs_QAOA:
             self.circuit = self.set_circuit(angles)
         state = QuantumState(self.n_qubits)
         self.circuit.update_quantum_state(state)
-        state_vector = state.get_vector()
-        self.counts = self.filter_small_probabilities(self.get_counts(state_vector=np.array(state_vector)))
+        self.counts = self.filter_small_probabilities(self.get_counts(state_vector=np.array(state.get_vector())))
         cost = np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO.Q) for
                         bitstring, probability in self.counts.items()])
         return cost
+
+    def get_statevector(self, angles):
+        if self.use_parametric_circuit_opt:
+            gamma, beta = angles[self.layers:], angles[:self.layers]
+            gate_counter = 0
+            for layer in range(self.layers):
+                # ------ Cost unitary: ------ #
+                # Weighted RZZ gate for each edge
+                for qubit_i, qubit_j, J_ij in self.J_list:
+                    self.circuit.set_parameter(index=gate_counter, parameter=2 * gamma[layer] * J_ij)
+                    gate_counter += 1
+                # Weighted RZ gate for each qubit
+                for qubit_i, h_i in self.h_list:
+                    self.circuit.set_parameter(index=gate_counter, parameter=2 * gamma[layer] * h_i)
+                    gate_counter += 1
+                # ------ Mixer unitary: ------ #
+                # Weighted X rotation on each qubit
+                for qubit_i in range(self.n_qubits):
+                    self.circuit.set_parameter(index=gate_counter, parameter=2 * beta[layer])
+                    gate_counter += 1
+        else:
+            self.circuit = self.set_circuit(angles)
+        state = QuantumState(self.n_qubits)
+        self.circuit.update_quantum_state(state)
+        return np.array(state.get_vector())
 
     def callback(self, x):
         probability_dict = self.counts

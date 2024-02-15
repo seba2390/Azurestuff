@@ -3,8 +3,8 @@ import random
 from collections import Counter
 
 from qiskit import QuantumCircuit, Aer, execute
-from qiskit.quantum_info import Operator
-from scipy.linalg import expm
+from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.synthesis import MatrixExponential, LieTrotter
 import numpy as np
 
 from src.Tools import (qubo_cost,
@@ -12,7 +12,7 @@ from src.Tools import (qubo_cost,
                        array_to_string,
                        normalized_cost)
 from src.Grid import Grid
-from src.Tools import get_full_hamiltonian
+from src.Tools import get_full_hamiltonian_matrix, get_qiskit_hamiltonian
 from src.Chain import Chain
 from src.Qubo import Qubo
 
@@ -96,13 +96,16 @@ class CP_VQA:
                     for qubit_i in range(self.n_qubits):
                         qcircuit.rz(phi=next(__angles__), qubit=qubit_i)
             else:
-                H = get_full_hamiltonian(indices=self.qubit_indices,
-                                         angles=angles[layer * len(angles) // self.layers:(layer + 1) * len(
-                                             angles) // self.layers],
-                                         N_qubits=self.n_qubits,
-                                         with_z_phase=self.with_z_phase)
                 time = 1.0
-                U_H = Operator(expm(-1j * time * H.data))
+                H = get_qiskit_hamiltonian(indices=self.qubit_indices,
+                                           angles=angles[layer * len(angles) // self.layers:(layer + 1) * len(
+                                             angles) // self.layers],
+                                           N_qubits=self.n_qubits,
+                                           with_z_phase=self.with_z_phase)
+                # MatrixExponential(): Exact operator evolution via matrix exponentiation and unitary synthesis
+                # LieTrotter(reps=M): Approximates the exponential of two non-commuting operators with products of
+                # their exponential up to a second order error, using "M" time steps
+                U_H = PauliEvolutionGate(operator=H, time=time, synthesis=MatrixExponential())
                 qcircuit.append(U_H, list(range(self.n_qubits)))
         return qcircuit
 
@@ -122,13 +125,13 @@ class CP_VQA:
         return np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO.Q) for
                         bitstring, probability in self.counts.items()])
 
-    def callback(self):
+    def callback(self, x):
         probability_dict = self.get_state_probabilities(flip_states=False)
         normalized_c = normalized_cost(result=probability_dict,
                                        QUBO_matrix=self.QUBO.Q,
                                        QUBO_offset=self.QUBO.offset,
                                        max_cost=self.QUBO.subspace_c_max,
-                                       min_cost=self.QUBO.subspace_c_min)
+                                       min_cost=self.QUBO.full_space_c_min)
         self.normalized_costs.append(normalized_c)
         x_min_str = array_to_string(array=self.QUBO.subspace_x_min)
         if x_min_str in list(probability_dict.keys()):

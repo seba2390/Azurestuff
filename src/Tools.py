@@ -1,9 +1,7 @@
-from typing import List, Tuple, Dict, Union
-from itertools import combinations
+from typing import List, Tuple, Dict
 
 from qiskit.quantum_info import Operator, SparsePauliOp
-from qiskit.quantum_info.operators import Pauli
-from scipy.sparse import csc_matrix, csr_matrix, kron, identity
+from scipy.sparse import csc_matrix, kron, identity
 
 import numpy as np
 
@@ -174,8 +172,10 @@ Z = csc_matrix(np.array([[1, 0], [0, -1]], dtype=np.complex64))
 gate_map = {'X': X, 'Y': Y, 'Z': Z, 'I': I}
 
 
-def get_full_hamiltonian(indices: List[Tuple[int, int]], angles: List[float], N_qubits: int,
-                         with_z_phase: bool = False):
+def get_full_hamiltonian_matrix(indices: List[Tuple[int, int]],
+                                angles: List[float],
+                                N_qubits: int,
+                                with_z_phase: bool = False) -> np.ndarray:
     terms = []
     for (qubit_i, qubit_j), theta_ij in zip(indices, angles[:len(indices)]):
         x_str = generate_string_representation(gate_names=['X', 'X'],
@@ -206,4 +206,31 @@ def get_full_hamiltonian(indices: List[Tuple[int, int]], angles: List[float], N_
     H = terms[0]
     for term in terms[1:]:
         H += term
-    return Operator(H.todense())
+    return H.todense()
+
+
+def get_qiskit_hamiltonian(indices: List[Tuple[int, int]],
+                           angles: List[float],
+                           N_qubits: int,
+                           with_z_phase: bool = False) -> SparsePauliOp:
+    coeffs, terms = [], []
+    for (qubit_i, qubit_j), theta_ij in zip(indices, angles[:len(indices)]):
+        H_xx_str = generate_string_representation(gate_names=['X', 'X'],
+                                                  qubit_indices=[qubit_i, qubit_j],
+                                                  N_qubits=N_qubits)[::-1]
+        terms.append(H_xx_str)
+        coeffs.append(float(theta_ij))
+        H_yy_str = generate_string_representation(gate_names=['Y', 'Y'],
+                                                  qubit_indices=[qubit_i, qubit_j],
+                                                  N_qubits=N_qubits)[::-1]
+        terms.append(H_yy_str)
+        coeffs.append(float(theta_ij))
+    if with_z_phase:
+        for qubit_i, theta_i in zip(list(range(N_qubits)), angles[len(angles):]):
+            H_z_str = generate_string_representation(gate_names=['Z'],
+                                                     qubit_indices=[qubit_i],
+                                                     N_qubits=N_qubits)[::-1]
+            terms.append(H_z_str)
+            coeffs.append(float(theta_i))
+
+    return SparsePauliOp(data=terms, coeffs=coeffs)

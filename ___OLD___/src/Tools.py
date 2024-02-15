@@ -115,57 +115,6 @@ def normalized_cost(result: Dict[str, float],
     return abs(found_cost - min_cost) / abs(max_cost - min_cost)
 
 
-def qubo_to_ising(Q, offset=0.0):
-    """Convert a QUBO problem to an Ising problem."""
-    h = {}
-    J = {}
-    linear_offset = 0.0
-    quadratic_offset = 0.0
-
-    for (u, v), bias in Q.items():
-        if u == v:
-            if u in h:
-                h[u] += .5 * bias
-            else:
-                h[u] = .5 * bias
-            linear_offset += bias
-
-        else:
-            if bias != 0.0:
-                J[(u, v)] = .25 * bias
-
-            if u in h:
-                h[u] += .25 * bias
-            else:
-                h[u] = .25 * bias
-
-            if v in h:
-                h[v] += .25 * bias
-            else:
-                h[v] = .25 * bias
-
-            quadratic_offset += bias
-
-    offset += .5 * linear_offset + .25 * quadratic_offset
-
-    return h, J, offset
-
-
-def get_ising(Q: np.ndarray, offset: float):
-    _Q_dict = {}
-    for i in range(Q.shape[0]):
-        for j in range(Q.shape[1]):
-            _Q_dict[(i, j)] = Q[i, j]
-
-    _h_dict, _J_dict, _offset_ = qubo_to_ising(Q=_Q_dict, offset=offset)
-    J_list, h_list = [], []
-    for key in _h_dict.keys():
-        h_list.append((key, _h_dict[key]))
-    for key in _J_dict.keys():
-        i, j = key
-        J_list.append((i, j, _J_dict[key]))
-    return J_list, h_list
-
 
 def check_qubo(QUBO_matrix: np.ndarray,
                QUBO_offset: float,

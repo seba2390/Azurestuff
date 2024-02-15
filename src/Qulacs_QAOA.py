@@ -1,68 +1,45 @@
-from typing import Union, List
 from itertools import combinations
+from typing import List
 
 import numpy as np
-import qulacs.circuit
 
 from qulacs import QuantumCircuit, ParametricQuantumCircuit
-from qulacs.gate import X
+from qulacs.circuit import QuantumCircuitOptimizer
+from qulacs.gate import H
 from qulacs import QuantumState
 
+from src.custom_qulacs_gates import RZZ, RZ, RX
+from src.custom_qulacs_gates import parametric_RZZ, parametric_RZ, parametric_RX
 from src.Tools import qubo_cost, string_to_array, array_to_string, normalized_cost
-from src.custom_qulacs_gates import RXX, RYY, parametric_RXX, parametric_RYY
-from src.Chain import Chain
 from src.Qubo import Qubo
-from src.Grid import Grid
+from src.Ising import get_ising
 
 
-class Qulacs_CP_VQA:
+class Qulacs_QAOA:
     def __init__(self,
                  N_qubits: int,
                  cardinality: int,
                  layers: int,
                  qubo: Qubo,
-                 topology: Union[Grid, Chain],
-                 get_full_state_vector: bool = True,
-                 use_parametric_circuit_opt: bool = True,
-                 with_next_nearest_neighbors: bool = False,
-                 approximate_hamiltonian: bool = True):
+                 use_parametric_circuit_opt: bool = True):
 
-        if not approximate_hamiltonian:
-            raise ValueError('Exact Hamiltonian not implemented yet...')
-        self.approximate_hamiltonian = approximate_hamiltonian
         self.n_qubits = N_qubits
-        self.cardinality = cardinality
         self.layers = layers
+        self.k = cardinality
         self.QUBO = qubo
-        self.with_next_nearest_neighbors = with_next_nearest_neighbors
+        self.J_list, self.h_list = get_ising(qubo=self.QUBO)
+
         self.use_parametric_circuit_opt = use_parametric_circuit_opt
-        self.get_full_state_vector = get_full_state_vector
-
-        if topology.N_qubits != self.n_qubits:
-            raise ValueError(f'provided topology consists of different number of qubits that provided for this ansatz.')
-
-        # Nearest Neighbors
-        self.nearest_neighbor_pairs = topology.get_NN_indices()
-        # Nearest + Next Nearest Neighbors
-        self.next_nearest_neighbor_pairs = topology.get_NNN_indices()
-        # Strategy for which qubits to set:
-        self.initialization_strategy = topology.get_initialization_indices()
-        # Indices to iterate over
-        self.qubit_indices = self.next_nearest_neighbor_pairs if self.with_next_nearest_neighbors else self.nearest_neighbor_pairs
-
         self.block_size = 2
-        self.optimizer = qulacs.circuit.QuantumCircuitOptimizer()
+        self.optimizer = QuantumCircuitOptimizer()
 
-        __dummy_angles__ = np.random.uniform(-2*np.pi, 2*np.pi, self.layers*len(self.qubit_indices))
+        __dummy_angles__ = np.random.uniform(-2 * np.pi, 2 * np.pi, 2 * self.layers)
         self.circuit = self.set_circuit(angles=__dummy_angles__)
 
         # For storing probability <-> state dict during opt. to avoid extra call for callback function
         self.counts = None
         self.normalized_costs = []
         self.opt_state_probabilities = []
-
-        self.states_strings = self.generate_bit_strings(N=self.n_qubits, k=self.cardinality)
-        self.states_ints = [int(string, 2) for string in self.states_strings]
 
     @staticmethod
     def generate_bit_strings(N, k) -> List[str]:
@@ -83,6 +60,7 @@ class Qulacs_CP_VQA:
                 bit_string[pos] = '1'
             bit_strings.append(''.join(bit_string)[::-1])
         return bit_strings
+
     @staticmethod
     def filter_small_probabilities(counts: dict[str, float], eps: float = 9e-15) -> dict[str, float]:
         return {state: prob for state, prob in counts.items() if prob >= eps}
@@ -101,28 +79,44 @@ class Qulacs_CP_VQA:
 
     def set_circuit(self, angles):
 
+        gamma = angles[self.layers:]
+        beta = angles[:self.layers]
+
         if self.use_parametric_circuit_opt:
             qcircuit = ParametricQuantumCircuit(self.n_qubits)
         else:
             qcircuit = QuantumCircuit(self.n_qubits)
 
-        # Initial state: 'k' excitations
-        for qubit_idx in self.initialization_strategy:
-            qcircuit.add_gate(X(index=qubit_idx))
+        # Initial state: initialize in |+>
+        for qubit_idx in range(self.n_qubits):
+            qcircuit.add_gate(H(index=qubit_idx))
 
         # Layered Ansatz
-        angle_counter = 0
         for layer in range(self.layers):
-            for qubit_i, qubit_j in self.qubit_indices:
-                if self.approximate_hamiltonian:
-                    theta = angles[angle_counter]
-                    if self.use_parametric_circuit_opt:
-                        parametric_RXX(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
-                        parametric_RYY(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
-                    else:
-                        RXX(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
-                        RYY(circuit=qcircuit, angle=theta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
-                    angle_counter += 1
+            if self.use_parametric_circuit_opt:
+                # ------ Cost unitary: ------ #
+                # Weighted RZZ gate for each edge
+                for qubit_i, qubit_j, J_ij in self.J_list:
+                    parametric_RZZ(circuit=qcircuit, angle=2 * gamma[layer] * J_ij, qubit_1=qubit_i, qubit_2=qubit_j)
+                # Weighted RZ gate for each qubit
+                for qubit_i, h_i in self.h_list:
+                    parametric_RZ(circuit=qcircuit, qubit=qubit_i, angle=2 * gamma[layer] * h_i)
+                # ------ Mixer unitary: ------ #
+                # Weighted X rotation on each qubit
+                for qubit_i in range(self.n_qubits):
+                    parametric_RX(circuit=qcircuit, qubit=qubit_i, angle=2 * beta[layer])
+            else:
+                # ------ Cost unitary: ------ #
+                # Weighted RZZ gate for each edge
+                for qubit_i, qubit_j, J_ij in self.J_list:
+                    RZZ(circuit=qcircuit, angle=2 * gamma[layer] * J_ij, qubit_1=qubit_i, qubit_2=qubit_j)
+                # Weighted RZ gate for each qubit
+                for qubit_i, h_i in self.h_list:
+                    RZ(circuit=qcircuit, qubit=qubit_i, angle=2 * gamma[layer] * h_i)
+                # ------ Mixer unitary: ------ #
+                # Weighted X rotation on each qubit
+                for qubit_i in range(self.n_qubits):
+                    RX(circuit=qcircuit, qubit=qubit_i, angle=2 * beta[layer])
 
         if self.use_parametric_circuit_opt:
             # Optimize the circuit (reduce nr. of gates)
@@ -131,22 +125,29 @@ class Qulacs_CP_VQA:
 
     def get_cost(self, angles):
         if self.use_parametric_circuit_opt:
-            idx_counter = 0
-            for theta_i in angles:
-                # Same angle for both Rxx and Ryy
-                self.circuit.set_parameter(index=idx_counter, parameter=theta_i)
-                self.circuit.set_parameter(index=idx_counter+1, parameter=theta_i)
-                idx_counter += 2
+            gamma, beta = angles[self.layers:], angles[:self.layers]
+            gate_counter = 0
+            for layer in range(self.layers):
+                # ------ Cost unitary: ------ #
+                # Weighted RZZ gate for each edge
+                for qubit_i, qubit_j, J_ij in self.J_list:
+                    self.circuit.set_parameter(index=gate_counter, parameter=2 * gamma[layer] * J_ij)
+                    gate_counter += 1
+                # Weighted RZ gate for each qubit
+                for qubit_i, h_i in self.h_list:
+                    self.circuit.set_parameter(index=gate_counter, parameter=2 * gamma[layer] * h_i)
+                    gate_counter += 1
+                # ------ Mixer unitary: ------ #
+                # Weighted X rotation on each qubit
+                for qubit_i in range(self.n_qubits):
+                    self.circuit.set_parameter(index=gate_counter, parameter=2 * beta[layer])
+                    gate_counter += 1
         else:
             self.circuit = self.set_circuit(angles)
         state = QuantumState(self.n_qubits)
         self.circuit.update_quantum_state(state)
-        if self.get_full_state_vector:
-            state_vector = state.get_vector()
-            self.counts = self.filter_small_probabilities(self.get_counts(state_vector=np.array(state_vector)))
-        else:
-            probabilities = np.array([np.abs(state.get_amplitude(comp_basis=s))**2 for s in self.states_ints], dtype=np.float32)
-            self.counts = self.filter_small_probabilities({self.states_strings[i]: probabilities[i] for i in range(len(probabilities))})
+        state_vector = state.get_vector()
+        self.counts = self.filter_small_probabilities(self.get_counts(state_vector=np.array(state_vector)))
         cost = np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO.Q) for
                         bitstring, probability in self.counts.items()])
         return cost
@@ -156,7 +157,7 @@ class Qulacs_CP_VQA:
         most_probable_state = string_to_array(list(probability_dict.keys())[np.argmax(list(probability_dict.values()))])
         normalized_c = normalized_cost(state=most_probable_state,
                                        QUBO_matrix=self.QUBO.Q,
-                                       QUBO_offset=0.0,
+                                       QUBO_offset=0.0 if np.sum(most_probable_state) == self.k else self.QUBO.offset,
                                        max_cost=self.QUBO.full_space_c_max,
                                        min_cost=self.QUBO.full_space_c_min)
         self.normalized_costs.append(normalized_c)
@@ -165,3 +166,5 @@ class Qulacs_CP_VQA:
             self.opt_state_probabilities.append(probability_dict[x_min_str])
         else:
             self.opt_state_probabilities.append(0)
+
+

@@ -99,7 +99,7 @@ class CP_VQA:
                 time = 1.0
                 H = get_qiskit_hamiltonian(indices=self.qubit_indices,
                                            angles=angles[layer * len(angles) // self.layers:(layer + 1) * len(
-                                             angles) // self.layers],
+                                               angles) // self.layers],
                                            N_qubits=self.n_qubits,
                                            with_z_phase=self.with_z_phase)
                 # MatrixExponential(): Exact operator evolution via matrix exponentiation and unitary synthesis
@@ -127,11 +127,13 @@ class CP_VQA:
 
     def callback(self, x):
         probability_dict = self.get_state_probabilities(flip_states=False)
-        normalized_c = normalized_cost(result=probability_dict,
+        most_probable_state = string_to_array(list(probability_dict.keys())[np.argmax(list(probability_dict.values()))])
+        normalized_c = normalized_cost(state=most_probable_state,
                                        QUBO_matrix=self.QUBO.Q,
-                                       QUBO_offset=self.QUBO.offset,
-                                       max_cost=self.QUBO.subspace_c_max,
+                                       QUBO_offset=0.0,  # Offset should only be added when ||state||_0 != k,
+                                       max_cost=self.QUBO.full_space_c_max,
                                        min_cost=self.QUBO.full_space_c_min)
+
         self.normalized_costs.append(normalized_c)
         x_min_str = array_to_string(array=self.QUBO.subspace_x_min)
         if x_min_str in list(probability_dict.keys()):

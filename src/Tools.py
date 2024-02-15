@@ -55,8 +55,8 @@ def min_cost_partition(nr_qubits: int,
                        mu: np.ndarray,
                        sigma: np.ndarray,
                        alpha: float) -> Tuple[dict, dict, float]:
-    max_cost_1, min_cost_1, min_comb = -np.inf, np.inf, np.empty(shape=(nr_qubits,))
-    max_cost_2, min_cost_2, min_perm = -np.inf, np.inf, np.empty(shape=(nr_qubits,))
+    max_cost_1, min_cost_1, min_comb, max_comb = -np.inf, np.inf, np.empty(shape=(nr_qubits,)), np.empty(shape=(nr_qubits,))
+    max_cost_2, min_cost_2, min_perm, max_perm = -np.inf, np.inf, np.empty(shape=(nr_qubits,)), np.empty(shape=(nr_qubits,))
     for perm in generate_binary_permutations(n=nr_qubits):
         cost = portfolio_cost(state=perm, mu=mu, sigma=sigma, alpha=alpha)
         if cost < min_cost_2:
@@ -67,16 +67,16 @@ def min_cost_partition(nr_qubits: int,
             if cost < min_cost_1:
                 min_cost_1, min_comb = cost, perm
             if cost > max_cost_1:
-                max_cost_1 = cost
-    binary_perm = min_perm
-    binary_comb = min_comb
+                max_cost_1, max_comb = cost, perm
 
     _lmbda_ = 0
     if min_cost_2 < min_cost_1:
         _lmbda_ = abs(min_cost_1 - min_cost_2)
 
-    _constrained_result_ = {'s': binary_comb, 'c_min': min_cost_1, 'c_max': max_cost_1}
-    _full_result_ = {'s': binary_perm, 'c_min': min_cost_2, 'c_max': max_cost_2}
+    _constrained_result_ = {'s_min': min_comb, 's_max': max_comb,
+                            'c_min': min_cost_1, 'c_max': max_cost_1}
+    _full_result_ = {'s_min': min_perm,   's_max': max_perm,
+                     'c_min': min_cost_2, 'c_max': max_cost_2}
     return _constrained_result_, _full_result_, _lmbda_
 
 
@@ -95,15 +95,14 @@ def get_qubo(mu: np.ndarray, sigma: np.ndarray, alpha: float, lmbda: float, k: f
     return Q, offset
 
 
-def normalized_cost(result: Dict[str, float],
+def normalized_cost(state: np.ndarray,
                     QUBO_matrix: np.ndarray,
-                    QUBO_offset,
+                    QUBO_offset: float,
                     max_cost: float,
                     min_cost: float) -> float:
     """ Calculates the QUBO cost of the single most probable state in the
     result state dict, and normalizes it wrt. min and max possible cost."""
-    best_state = list(result.keys())[np.argmax(list(result.values()))]
-    found_cost = qubo_cost(np.array([float(_) for _ in best_state]).astype(np.float64), QUBO_matrix) + QUBO_offset
+    found_cost = qubo_cost(state, QUBO_matrix) + QUBO_offset
     return abs(found_cost - min_cost) / abs(max_cost - min_cost)
 
 
@@ -120,10 +119,10 @@ def check_qubo(QUBO_matrix: np.ndarray,
     for state in generate_binary_permutations(n=N_QUBITS):
         QUBO_cost = full_qubo_cost(state=state, QUBO_matrix=QUBO_matrix, QUBO_offset=QUBO_offset)
         PORTFOLIO_cost = portfolio_cost(state=state, mu=expected_returns, sigma=covariances, alpha=alpha)
-        if not np.isclose(QUBO_cost, PORTFOLIO_cost):
-            if np.sum(state) == k:
+        if np.sum(state) == k:
+            if not np.isclose(QUBO_cost, PORTFOLIO_cost):
                 raise ValueError(
-                    f'state={"|" + "".join([str(_) for _ in state]) + ">"}, QUBO: {QUBO_cost}, PORTFOLIO: {PORTFOLIO_cost}')
+                        f'state={"|" + "".join([str(_) for _ in state]) + ">"}, QUBO: {QUBO_cost}, PORTFOLIO: {PORTFOLIO_cost}')
 
 
 def qubo_limits(Q: np.ndarray, offset: float):
@@ -234,3 +233,5 @@ def get_qiskit_hamiltonian(indices: List[Tuple[int, int]],
             coeffs.append(float(theta_i))
 
     return SparsePauliOp(data=terms, coeffs=coeffs)
+
+

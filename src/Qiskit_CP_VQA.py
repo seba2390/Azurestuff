@@ -3,7 +3,7 @@ import random
 from collections import Counter
 
 from qiskit import QuantumCircuit, Aer, execute
-from qiskit.quantum_info import Operator, Statevector
+from qiskit.quantum_info import Operator
 from scipy.linalg import expm
 import numpy as np
 

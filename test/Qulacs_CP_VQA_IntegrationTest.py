@@ -36,7 +36,7 @@ def generate_count_test_cases(nr_rng_trials: int, use_param_circuit_opt: bool, g
                                               cardinality=k,
                                               layers=layers,
                                               topology=topology,
-                                              QUBO_matrix=Q,
+                                              qubo=Qubo(Q,0.0),
                                               get_full_state_vector=get_full_sv,
                                               use_parametric_circuit_opt=use_param_circuit_opt,
                                               approximate_hamiltonian=True)

@@ -182,7 +182,7 @@ class Qulacs_QAOA:
         if np.sum(most_probable_state) == self.k:
             normalized_c = normalized_cost(state=most_probable_state,
                                            QUBO_matrix=self.QUBO.Q,
-                                           QUBO_offset=0.0,
+                                           QUBO_offset=self.QUBO.offset,
                                            max_cost=self.QUBO.subspace_c_max,
                                            min_cost=self.QUBO.subspace_c_min)
             self.normalized_costs.append(normalized_c)

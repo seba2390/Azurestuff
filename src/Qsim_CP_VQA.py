@@ -5,7 +5,6 @@ import os
 
 import cirq
 import qsimcirq
-from cirq.ops.named_qubit import NamedQubit
 import sympy
 import numpy as np
 

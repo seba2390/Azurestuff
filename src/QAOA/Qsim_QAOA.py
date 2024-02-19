@@ -10,48 +10,24 @@ from src.Tools import (qubo_cost,
                        array_to_string,
                        normalized_cost)
 
+from src.QAOA.QAOA import QAOA
 from src.Qubo import Qubo
-from src.Ising import get_ising
 from src.custom_cirq_gates import RZZ, RZ, RX
 
 
-class Qsim_QAOA:
-    def __init__(self,
-                 N_qubits: int,
+class Qsim_QAOA(QAOA):
+    def __init__(self, N_qubits: int,
                  cardinality: int,
                  layers: int,
-                 qubo: Qubo,
-                 normalize_cost: bool = False):
-        self.n_qubits = N_qubits
-        self.k = cardinality
-        self.layers = layers
-        self.QUBO = qubo
-        self.J_list, self.h_list = get_ising(qubo=qubo)
+                 qubo: Qubo):
+        super().__init__(N_qubits, cardinality, layers, qubo)
 
-        self.normalize_cost = normalize_cost
         # Read bottom of page: https://quantumai.google/cirq/simulate/simulation
         # and consider: https://github.com/quantumlib/qsim/blob/master/docs/tutorials/qsimcirq.ipynb
         # and consider https://developer.nvidia.com/blog/accelerating-quantum-circuit-simulation-with-nvidia-custatevec/
         options = qsimcirq.QSimOptions(max_fused_gate_size=3, cpu_threads=os.cpu_count())
         self.simulator = qsimcirq.QSimSimulator(options)
-
         self.circuit = self.set_circuit()
-        # For storing probability <-> state dict during opt. to avoid extra call for callback function
-        self.counts = None
-        self.normalized_costs = []
-        self.opt_state_probabilities = []
-
-    @staticmethod
-    def _int_to_fixed_length_binary_array_(number: int, num_bits: int) -> str:
-        # Convert the number to binary and remove the '0b' prefix
-        binary_str = bin(number)[2:]
-        # Pad the binary string with zeros if necessary
-        return binary_str.zfill(num_bits)
-
-    def get_counts(self, state_vector: np.ndarray) -> dict[str, float]:
-        n_qubits = int(np.log2(len(state_vector)))
-        return {self._int_to_fixed_length_binary_array_(number=idx, num_bits=n_qubits): np.abs(state_vector[idx]) ** 2
-                for idx in range(len(state_vector))}
 
     def set_circuit(self):
 
@@ -94,7 +70,7 @@ class Qsim_QAOA:
                         bitstring, probability in self.counts.items()])
         return cost
 
-    def get_statevector(self, angles):
+    def get_state_vector(self, angles):
         gamma_values = angles[self.layers:]
         beta_values = angles[:self.layers]
         total_dict = {**{f"gamma_{i}": gamma_values[i] for i in range(len(gamma_values))},
@@ -121,8 +97,3 @@ class Qsim_QAOA:
         else:
             self.opt_state_probabilities.append(0)
 
-    def get_state_probabilities(self, flip_states: bool = True) -> dict:
-        counts = self.counts
-        if flip_states:
-            return {bitstring[::-1]: probability for bitstring, probability in counts.items()}
-        return {bitstring[::-1]: probability for bitstring, probability in counts.items()}

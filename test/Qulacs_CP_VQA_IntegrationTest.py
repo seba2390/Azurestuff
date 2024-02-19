@@ -2,8 +2,8 @@ from typing import List, Tuple, Dict
 import pytest
 import numpy as np
 from src.Chain import Chain
-from src.Qulacs_CP_VQA import Qulacs_CP_VQA
-from src.Qiskit_CP_VQA import CP_VQA
+from src.CP_VQA.Qulacs_CP_VQA import Qulacs_CP_VQA
+from src.CP_VQA.Qiskit_CP_VQA import Qiskit_CP_VQA
 from src.Qubo import Qubo
 
 
@@ -36,18 +36,17 @@ def generate_count_test_cases(nr_rng_trials: int, use_param_circuit_opt: bool, g
                                               cardinality=k,
                                               layers=layers,
                                               topology=topology,
-                                              qubo=Qubo(Q,0.0),
+                                              qubo=Qubo(Q, 0.0),
                                               get_full_state_vector=get_full_sv,
-                                              use_parametric_circuit_opt=use_param_circuit_opt,
-                                              approximate_hamiltonian=True)
+                                              use_parametric_circuit_opt=use_param_circuit_opt)
                 Qulacs_ansatz.get_cost(angles=angles)
 
-                Qiskit_ansatz = CP_VQA(N_qubits=N,
-                                       cardinality=k,
-                                       layers=layers,
-                                       topology=topology,
-                                       qubo=Qubo(Q=Q, offset=0.0),
-                                       approximate_hamiltonian=True)
+                Qiskit_ansatz = Qiskit_CP_VQA(N_qubits=N,
+                                              cardinality=k,
+                                              layers=layers,
+                                              topology=topology,
+                                              qubo=Qubo(Q=Q, offset=0.0),
+                                              approximate_hamiltonian=True)
                 Qiskit_ansatz.get_cost(angles=angles)
 
                 test_cases.append((filter_small_probabilities(Qulacs_ansatz.counts),

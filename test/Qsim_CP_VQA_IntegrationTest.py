@@ -2,8 +2,8 @@ from typing import List, Tuple, Dict
 import pytest
 import numpy as np
 from src.Chain import Chain
-from src.Qsim_CP_VQA import Qsim_CP_VQA
-from src.Qiskit_CP_VQA import CP_VQA
+from src.CP_VQA.Qsim_CP_VQA import Qsim_CP_VQA
+from src.CP_VQA.Qiskit_CP_VQA import Qiskit_CP_VQA
 from src.Qubo import Qubo
 
 
@@ -32,19 +32,18 @@ def generate_count_test_cases(nr_rng_trials: int) -> List[Tuple[Dict[str, float]
                 Q = np.random.uniform(0, 1, (N, N))
                 Q = (Q + Q.T) / 2.0
                 Qsim_ansatz = Qsim_CP_VQA(N_qubits=N,
-                                              cardinality=k,
-                                              layers=layers,
-                                              topology=topology,
-                                              QUBO_matrix=Q,
-                                              approximate_hamiltonian=True)
+                                          cardinality=k,
+                                          layers=layers,
+                                          topology=topology,
+                                          qubo=Qubo(Q=Q, offset=0.0))
                 Qsim_ansatz.get_cost(angles=angles)
 
-                Qiskit_ansatz = CP_VQA(N_qubits=N,
-                                        cardinality=k,
-                                        layers=layers,
-                                        topology=topology,
-                                        qubo=Qubo(Q=Q, offset=0),
-                                        approximate_hamiltonian=True)
+                Qiskit_ansatz = Qiskit_CP_VQA(N_qubits=N,
+                                       cardinality=k,
+                                       layers=layers,
+                                       topology=topology,
+                                       qubo=Qubo(Q=Q, offset=0),
+                                       approximate_hamiltonian=True)
                 Qiskit_ansatz.get_cost(angles=angles)
 
                 test_cases.append((filter_small_probabilities(Qsim_ansatz.counts),
@@ -66,7 +65,6 @@ test_cases_1 = generate_count_test_cases(nr_rng_trials=N_RNG_TRIALS)
 def test_probabilities_1(qsim_counts: Dict[str, float],
                          qiskit_counts: Dict[str, float],
                          cardinality: int):
-
     # Comparing probabilities of two approaches
     for state, probability in qiskit_counts.items():
         # Comparing probabilities of two approaches
@@ -79,4 +77,3 @@ def test_probabilities_1(qsim_counts: Dict[str, float],
 
     # Checking that all probability is included (should sum to approx. 1)
     assert np.isclose(sum([p for p in list(qsim_counts.values())]), 1.0)
-

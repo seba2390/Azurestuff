@@ -2,8 +2,8 @@ from typing import List, Tuple, Dict
 import pytest
 import numpy as np
 from src.Chain import Chain
-from src.Qulacs_QAOA import Qulacs_QAOA
-from src.Qiskit_QAOA import Qiskit_QAOA
+from src.QAOA.Qulacs_QAOA import Qulacs_QAOA
+from src.QAOA.Qiskit_QAOA import Qiskit_QAOA
 from src.Qubo import Qubo
 
 

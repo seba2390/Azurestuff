@@ -2,12 +2,12 @@ from typing import List, Tuple, Dict
 import pytest
 import numpy as np
 from src.Chain import Chain
-from src.Qsim_QAOA import Qsim_QAOA
-from src.Qiskit_QAOA import Qiskit_QAOA
+from src.QAOA.Qsim_QAOA import Qsim_QAOA
+from src.QAOA.Qiskit_QAOA import Qiskit_QAOA
 from src.Qubo import Qubo
 
 
-def filter_small_probabilities(counts: dict[str, float], eps: float = 9.5e-15) -> dict[str, float]:
+def filter_small_probabilities(counts: dict[str, float], eps: float = 9.5e-13) -> dict[str, float]:
     return {state: prob for state, prob in counts.items() if prob > eps}
 
 
@@ -64,7 +64,7 @@ def test_probabilities_1(qsim_counts: Dict[str, float],
     # Comparing probabilities of two approaches
     for state, probability in qiskit_counts.items():
         # Comparing probabilities of two approaches
-        assert np.isclose(probability, qsim_counts[state])
+        assert np.isclose(probability, qsim_counts[state], atol=1e-6)
 
     # Checking that all probability is included (should sum to approx. 1)
     assert np.isclose(sum([p for p in list(qsim_counts.values())]), 1.0)

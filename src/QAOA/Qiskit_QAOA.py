@@ -1,38 +1,22 @@
-from typing import List, Tuple, Union
-from time import time
-import os
+from typing import List, Union
 
 from qiskit import QuantumCircuit, Aer, execute
-from qiskit.quantum_info import Operator
-from scipy.linalg import expm
 import numpy as np
 
 from src.Tools import qubo_cost, string_to_array, array_to_string, normalized_cost
 from src.Qubo import Qubo
-from src.Ising import get_ising
-from src.Grid import Grid
-from src.Chain import Chain
+from src.QAOA.QAOA import QAOA
 
 
-class Qiskit_QAOA:
-    def __init__(self,
-                 N_qubits: int,
+class Qiskit_QAOA(QAOA):
+    def __init__(self, N_qubits: int,
                  cardinality: int,
                  layers: int,
                  qubo: Qubo):
-        self.n_qubits = N_qubits
-        self.layers = layers
-        self.k = cardinality
-        self.QUBO = qubo
-        self.J_list, self.h_list = get_ising(qubo=self.QUBO)
+        super().__init__(N_qubits, cardinality, layers, qubo)
         self.simulator = Aer.get_backend('statevector_simulator')
 
-        # For storing probability <-> state dict during opt. to avoid extra call for callback function
-        self.counts = None
-        self.normalized_costs = []
-        self.opt_state_probabilities = []
-
-    def set_circuit(self, angles):
+    def set_circuit(self, angles: Union[np.ndarray[float], List[float]]):
 
         gamma = angles[self.layers:]
         beta = angles[:self.layers]
@@ -62,21 +46,19 @@ class Qiskit_QAOA:
 
         return qcircuit
 
-    def get_cost(self, angles) -> float:
+    def get_cost(self, angles: Union[np.ndarray[float], List[float]]) -> float:
         circuit = self.set_circuit(angles=angles)
         self.counts = execute(circuit, self.simulator).result().get_counts()
         cost = np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO.Q)
                         for bitstring, probability in self.counts.items()])
         return cost
 
-    def get_state_probabilities(self, flip_states: bool = True) -> dict:
-        counts = self.counts
-        if flip_states:
-            return {bitstring[::-1]: probability for bitstring, probability in counts.items()}
-        return {bitstring: probability for bitstring, probability in counts.items()}
+    def get_state_vector(self, angles: Union[np.ndarray[float], List[float]]) -> np.ndarray:
+        circuit = self.set_circuit(angles=angles)
+        return np.array(execute(circuit, self.simulator).result().get_statevector())
 
     def callback(self, x):
-        probability_dict = self.get_state_probabilities(flip_states=False)
+        probability_dict = self.counts
         most_probable_state = string_to_array(list(probability_dict.keys())[np.argmax(list(probability_dict.values()))])
         if np.sum(most_probable_state) == self.k:
             normalized_c = normalized_cost(state=most_probable_state,

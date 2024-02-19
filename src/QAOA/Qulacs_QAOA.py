@@ -8,26 +8,20 @@ from qulacs.circuit import QuantumCircuitOptimizer
 from qulacs.gate import H
 from qulacs import QuantumState
 
+from src.QAOA.QAOA import QAOA
 from src.custom_qulacs_gates import RZZ, RZ, RX
 from src.custom_qulacs_gates import parametric_RZZ, parametric_RZ, parametric_RX
 from src.Tools import qubo_cost, string_to_array, array_to_string, normalized_cost
 from src.Qubo import Qubo
-from src.Ising import get_ising
 
 
-class Qulacs_QAOA:
-    def __init__(self,
-                 N_qubits: int,
+class Qulacs_QAOA(QAOA):
+    def __init__(self, N_qubits: int,
                  cardinality: int,
                  layers: int,
                  qubo: Qubo,
                  use_parametric_circuit_opt: bool = True):
-
-        self.n_qubits = N_qubits
-        self.layers = layers
-        self.k = cardinality
-        self.QUBO = qubo
-        self.J_list, self.h_list = get_ising(qubo=self.QUBO)
+        super().__init__(N_qubits, cardinality, layers, qubo)
 
         self.use_parametric_circuit_opt = use_parametric_circuit_opt
         self.block_size = 2
@@ -35,11 +29,6 @@ class Qulacs_QAOA:
 
         __dummy_angles__ = np.random.uniform(-2 * np.pi, 2 * np.pi, 2 * self.layers)
         self.circuit = self.set_circuit(angles=__dummy_angles__)
-
-        # For storing probability <-> state dict during opt. to avoid extra call for callback function
-        self.counts = None
-        self.normalized_costs = []
-        self.opt_state_probabilities = []
 
     @staticmethod
     def generate_bit_strings(N, k) -> List[str]:
@@ -60,22 +49,6 @@ class Qulacs_QAOA:
                 bit_string[pos] = '1'
             bit_strings.append(''.join(bit_string)[::-1])
         return bit_strings
-
-    @staticmethod
-    def filter_small_probabilities(counts: dict[str, float], eps: float = 9e-15) -> dict[str, float]:
-        return {state: prob for state, prob in counts.items() if prob >= eps}
-
-    @staticmethod
-    def _int_to_fixed_length_binary_array_(number: int, num_bits: int) -> str:
-        # Convert the number to binary and remove the '0b' prefix
-        binary_str = bin(number)[2:]
-        # Pad the binary string with zeros if necessary
-        return binary_str.zfill(num_bits)
-
-    def get_counts(self, state_vector: np.ndarray) -> dict[str, float]:
-        n_qubits = int(np.log2(len(state_vector)))
-        return {self._int_to_fixed_length_binary_array_(number=idx, num_bits=n_qubits): np.abs(state_vector[idx]) ** 2
-                for idx in range(len(state_vector))}
 
     def set_circuit(self, angles):
 
@@ -151,7 +124,7 @@ class Qulacs_QAOA:
                         bitstring, probability in self.counts.items()])
         return cost
 
-    def get_statevector(self, angles):
+    def get_state_vector(self, angles):
         if self.use_parametric_circuit_opt:
             gamma, beta = angles[self.layers:], angles[:self.layers]
             gate_counter = 0

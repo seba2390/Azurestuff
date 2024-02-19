@@ -1,68 +1,40 @@
-from typing import Dict, Union
+from typing import Union, List
 import random
 from collections import Counter
 
 from qiskit import QuantumCircuit, Aer, execute
 from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.synthesis import MatrixExponential, LieTrotter
+from qiskit.synthesis import MatrixExponential
 import numpy as np
 
 from src.Tools import (qubo_cost,
                        string_to_array,
                        array_to_string,
                        normalized_cost)
+
+from src.CP_VQA.CP_VQA import CP_VQA
 from src.Grid import Grid
-from src.Tools import get_full_hamiltonian_matrix, get_qiskit_hamiltonian
+from src.Tools import get_qiskit_hamiltonian
 from src.Chain import Chain
 from src.Qubo import Qubo
 
 
-class CP_VQA:
+class Qiskit_CP_VQA(CP_VQA):
     def __init__(self,
                  N_qubits,
                  cardinality,
                  layers,
                  qubo: Qubo,
                  topology: Union[Grid, Chain],
-                 with_z_phase: bool = False,
                  with_next_nearest_neighbors: bool = False,
-                 with_gradient: bool = False,
                  approximate_hamiltonian: bool = True,
-                 normalize_cost: bool = False,
                  backend: str = 'state_vector',
                  N_samples: int = 1000,
                  seed: int = 0):
+        super().__init__(N_qubits, cardinality, layers, qubo, topology, with_next_nearest_neighbors)
         random.seed(seed)
 
-        self.n_qubits = N_qubits
-        self.cardinality = cardinality
-        self.layers = layers
-        self.QUBO = qubo
-
-        # self.O = create_operator(Q=self.Q)
-        self.with_next_nearest_neighbors = with_next_nearest_neighbors
-        self.with_z_phase = with_z_phase
         self.approximate_hamiltonian = approximate_hamiltonian
-        self.normalize_cost = normalize_cost
-        self.with_gradient = with_gradient
-
-        if topology.N_qubits != self.n_qubits:
-            raise ValueError(f'provided topology consists of different number of qubits that provided for this ansatz.')
-
-        # Nearest Neighbors
-        self.nearest_neighbor_pairs = topology.get_NN_indices()
-        # Nearest + Next Nearest Neighbors
-        self.next_nearest_neighbor_pairs = topology.get_NNN_indices()
-        # Strategy for which qubits to set:
-        self.initialization_strategy = topology.get_initialization_indices()
-        # Indices to iterate over
-        self.qubit_indices = self.next_nearest_neighbor_pairs if self.with_next_nearest_neighbors else self.nearest_neighbor_pairs
-
-        # For storing probability <-> state dict during opt. to avoid extra call for callback function
-        self.counts = None
-        self.normalized_costs = []
-        self.opt_state_probabilities = []
-
         if backend not in ['state_vector', 'sample']:
             raise ValueError(f'provided backend should be either "state_vector" or "sample"')
         self.backend = backend
@@ -87,23 +59,23 @@ class CP_VQA:
                     theta_ij = next(__angles__)
                     qcircuit.rxx(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
                     qcircuit.ryy(theta=theta_ij, qubit1=qubit_i, qubit2=qubit_j)
-                # Z terms
-                if self.with_z_phase:
-                    for qubit_i in range(self.n_qubits):
-                        qcircuit.rz(phi=next(__angles__), qubit=qubit_i)
             else:
                 time = 1.0
                 H = get_qiskit_hamiltonian(indices=self.qubit_indices,
                                            angles=angles[layer * len(angles) // self.layers:(layer + 1) * len(
                                                angles) // self.layers],
                                            N_qubits=self.n_qubits,
-                                           with_z_phase=self.with_z_phase)
+                                           with_z_phase=False)
                 # MatrixExponential(): Exact operator evolution via matrix exponentiation and unitary synthesis
                 # LieTrotter(reps=M): Approximates the exponential of two non-commuting operators with products of
                 # their exponential up to a second order error, using "M" time steps
                 U_H = PauliEvolutionGate(operator=H, time=time, synthesis=MatrixExponential())
                 qcircuit.append(U_H, list(range(self.n_qubits)))
         return qcircuit
+
+    def get_state_vector(self, angles: Union[np.ndarray[float], List[float]]) -> np.ndarray:
+        circuit = self.set_circuit(angles=angles)
+        return np.array(execute(circuit, self.simulator).result().get_statevector())
 
     def get_cost(self, angles) -> float:
         circuit = self.set_circuit(angles=angles)
@@ -124,7 +96,7 @@ class CP_VQA:
     def callback(self, x):
         eps = 1e-5
 
-        probability_dict = self.get_state_probabilities(flip_states=False)
+        probability_dict = self.counts
         most_probable_state = string_to_array(list(probability_dict.keys())[np.argmax(list(probability_dict.values()))])
         normalized_c = normalized_cost(state=most_probable_state,
                                        QUBO_matrix=self.QUBO.Q,
@@ -142,8 +114,3 @@ class CP_VQA:
         else:
             self.opt_state_probabilities.append(0)
 
-    def get_state_probabilities(self, flip_states: bool = True) -> Dict:
-        counts = self.counts
-        if flip_states:
-            return {bitstring[::-1]: probability for bitstring, probability in counts.items()}
-        return {bitstring: probability for bitstring, probability in counts.items()}

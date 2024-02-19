@@ -73,7 +73,6 @@ class CP_VQA:
 
     def set_circuit(self, angles):
         __angles__ = iter(angles)
-
         # Defining circuit
         qcircuit = QuantumCircuit(self.n_qubits)
 

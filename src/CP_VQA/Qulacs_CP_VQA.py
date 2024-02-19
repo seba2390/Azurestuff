@@ -23,7 +23,7 @@ class Qulacs_CP_VQA(CP_VQA):
                  qubo: Qubo,
                  topology: Union[Grid, Chain],
                  with_next_nearest_neighbors: bool = False,
-                 get_full_state_vector: bool = True,
+                 get_full_state_vector: bool = False,
                  use_parametric_circuit_opt: bool = True):
         super().__init__(N_qubits, cardinality, layers, qubo, topology, with_next_nearest_neighbors)
 

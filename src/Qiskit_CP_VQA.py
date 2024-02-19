@@ -31,11 +31,8 @@ class CP_VQA:
                  normalize_cost: bool = False,
                  backend: str = 'state_vector',
                  N_samples: int = 1000,
-                 seed: int = 0,
-                 debug_verbose: bool = False):
+                 seed: int = 0):
         random.seed(seed)
-
-        self.debug_verbose = debug_verbose
 
         self.n_qubits = N_qubits
         self.cardinality = cardinality
@@ -126,14 +123,19 @@ class CP_VQA:
                         bitstring, probability in self.counts.items()])
 
     def callback(self, x):
+        eps = 1e-5
+
         probability_dict = self.get_state_probabilities(flip_states=False)
         most_probable_state = string_to_array(list(probability_dict.keys())[np.argmax(list(probability_dict.values()))])
         normalized_c = normalized_cost(state=most_probable_state,
                                        QUBO_matrix=self.QUBO.Q,
-                                       QUBO_offset=0.0,  # Offset should only be added when ||state||_0 != k,
-                                       max_cost=self.QUBO.full_space_c_max,
-                                       min_cost=self.QUBO.full_space_c_min)
-
+                                       QUBO_offset=self.QUBO.offset,
+                                       max_cost=self.QUBO.subspace_c_max,
+                                       min_cost=self.QUBO.subspace_c_min)
+        if 0 - eps > normalized_c or 1 + eps < normalized_c:
+            raise ValueError(
+                f'Not a valid normalized cost for Qulacs_CPVQA. Specifically, the normalized cost is: {normalized_c}'
+                f'and this is given for most probable state: {most_probable_state}')
         self.normalized_costs.append(normalized_c)
         x_min_str = array_to_string(array=self.QUBO.subspace_x_min)
         if x_min_str in list(probability_dict.keys()):

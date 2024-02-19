@@ -160,7 +160,7 @@ class Qulacs_CP_VQA:
             self.counts = self.filter_small_probabilities(self.get_counts(state_vector=np.array(state_vector)))
         else:
             probabilities = np.array([np.abs(state.get_amplitude(comp_basis=s))**2 for s in self.states_ints], dtype=np.float32)
-            self.counts = self.filter_small_probabilities({self.states_strings[i]: probabilities[i] for i in range(len(probabilities))})
+            self.counts = self.filter_small_probabilities({self.states_strings[i]: np.float32(probabilities[i]) for i in range(len(probabilities))})
         cost = np.mean([probability * qubo_cost(state=string_to_array(bitstring), QUBO_matrix=self.QUBO.Q) for
                         bitstring, probability in self.counts.items()])
         return cost

@@ -9,9 +9,10 @@ import sympy
 import numpy as np
 
 from src.custom_cirq_gates import RXX, RYY
-from src.Tools import qubo_cost, string_to_array
+from src.Tools import qubo_cost, string_to_array, array_to_string, normalized_cost
 from src.Grid import Grid
 from src.Chain import Chain
+from src.Qubo import Qubo
 
 
 class Qsim_CP_VQA:
@@ -19,12 +20,13 @@ class Qsim_CP_VQA:
                  N_qubits,
                  cardinality,
                  layers,
-                 QUBO_matrix,
+                 qubo: Qubo,
                  topology: Union[Grid, Chain],
-                 get_full_state_vector: bool = True,
                  with_z_phase: bool = False,
+                 get_full_state_vector: bool = False,
                  with_next_nearest_neighbors: bool = False,
-                 approximate_hamiltonian: bool = True):
+                 approximate_hamiltonian: bool = True,
+                 seed: int = 0):
 
         if not approximate_hamiltonian:
             raise ValueError('Exact Hamiltonian not implemented yet...')
@@ -36,7 +38,7 @@ class Qsim_CP_VQA:
         self.n_qubits = N_qubits
         self.cardinality = cardinality
         self.layers = layers
-        self.Q = QUBO_matrix.astype(np.float32)
+        self.QUBO = qubo
         self.with_next_nearest_neighbors = with_next_nearest_neighbors
 
         if topology.N_qubits != self.n_qubits:
@@ -59,7 +61,9 @@ class Qsim_CP_VQA:
         options = qsimcirq.QSimOptions(max_fused_gate_size=3, cpu_threads=os.cpu_count())
         self.simulator = qsimcirq.QSimSimulator(options)
         self.circuit = self.set_circuit()
-        self.cost_time, self.circuit_time = 0.0, 0.0
+
+        self.normalized_costs, self.opt_state_probabilities = [], []
+
 
     @staticmethod
     def generate_bit_strings(N, k) -> List[str]:
@@ -144,3 +148,24 @@ class Qsim_CP_VQA:
         if flip_states:
             return {bitstring[::-1]: probability for bitstring, probability in counts.items()}
         return {bitstring[::-1]: probability for bitstring, probability in counts.items()}
+
+
+    def callback(self, x):
+        eps = 1e-5
+        probability_dict = self.counts
+        most_probable_state = string_to_array(list(probability_dict.keys())[np.argmax(list(probability_dict.values()))])
+        normalized_c = normalized_cost(state=most_probable_state,
+                                       QUBO_matrix=self.QUBO.Q,
+                                       QUBO_offset=self.QUBO.offset,
+                                       max_cost=self.QUBO.subspace_c_max,
+                                       min_cost=self.QUBO.subspace_c_min)
+        if 0 - eps > normalized_c or 1 + eps < normalized_c:
+            raise ValueError(
+                f'Not a valid normalized cost for Qulacs_CPVQA. Specifically, the normalized cost is: {normalized_c}'
+                f'and this is given for most probable state: {most_probable_state}')
+        self.normalized_costs.append(normalized_c)
+        x_min_str = array_to_string(array=self.QUBO.subspace_x_min)
+        if x_min_str in list(probability_dict.keys()):
+            self.opt_state_probabilities.append(probability_dict[x_min_str])
+        else:
+            self.opt_state_probabilities.append(0)

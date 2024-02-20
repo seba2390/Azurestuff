@@ -3,8 +3,7 @@ import pytest
 import numpy as np
 import qulacs
 from qiskit import QuantumCircuit, Aer, execute
-from scipy.linalg import expm
-from src.custom_qulacs_gates import parametric_RXX, parametric_RYY
+from src.custom_gates.custom_qulacs_gates import parametric_RXX, parametric_RYY
 
 # TODO: Find out why Qulacs single qubit rotation is opposite sign of qiskit??
 

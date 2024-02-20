@@ -8,8 +8,8 @@ from qulacs import QuantumCircuit, ParametricQuantumCircuit
 from qulacs.gate import X
 from qulacs import QuantumState
 
-from src.Tools import get_ising, qubo_cost, string_to_array
-from src.custom_qulacs_gates import RXX, RYY, parametric_RXX, parametric_RYY
+from src.Tools import qubo_cost, string_to_array
+from src.custom_gates.custom_qulacs_gates import RXX, RYY, parametric_RXX, parametric_RYY
 from src.Chain import Chain
 from src.Grid import Grid
 

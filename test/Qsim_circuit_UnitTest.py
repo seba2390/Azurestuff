@@ -8,7 +8,7 @@ from qiskit import QuantumCircuit, Aer, execute
 import cirq
 import qsimcirq
 
-from src.custom_cirq_gates import RXX, RYY
+from src.custom_gates.custom_cirq_gates import RXX, RYY
 
 
 def filter_probabilities(probabilities: np.ndarray, eps: float = 5e-14) -> np.ndarray:

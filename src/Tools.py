@@ -55,8 +55,10 @@ def min_cost_partition(nr_qubits: int,
                        mu: np.ndarray,
                        sigma: np.ndarray,
                        alpha: float) -> Tuple[dict, dict, float]:
-    max_cost_1, min_cost_1, min_comb, max_comb = -np.inf, np.inf, np.empty(shape=(nr_qubits,)), np.empty(shape=(nr_qubits,))
-    max_cost_2, min_cost_2, min_perm, max_perm = -np.inf, np.inf, np.empty(shape=(nr_qubits,)), np.empty(shape=(nr_qubits,))
+    max_cost_1, min_cost_1, min_comb, max_comb = -np.inf, np.inf, np.empty(shape=(nr_qubits,)), np.empty(
+        shape=(nr_qubits,))
+    max_cost_2, min_cost_2, min_perm, max_perm = -np.inf, np.inf, np.empty(shape=(nr_qubits,)), np.empty(
+        shape=(nr_qubits,))
     for perm in generate_binary_permutations(n=nr_qubits):
         cost = portfolio_cost(state=perm, mu=mu, sigma=sigma, alpha=alpha)
         if cost < min_cost_2:
@@ -75,7 +77,7 @@ def min_cost_partition(nr_qubits: int,
 
     _constrained_result_ = {'s_min': min_comb, 's_max': max_comb,
                             'c_min': min_cost_1, 'c_max': max_cost_1}
-    _full_result_ = {'s_min': min_perm,   's_max': max_perm,
+    _full_result_ = {'s_min': min_perm, 's_max': max_perm,
                      'c_min': min_cost_2, 'c_max': max_cost_2}
     return _constrained_result_, _full_result_, _lmbda_
 
@@ -122,7 +124,7 @@ def check_qubo(QUBO_matrix: np.ndarray,
         if np.sum(state) == k:
             if not np.isclose(QUBO_cost, PORTFOLIO_cost):
                 raise ValueError(
-                        f'state={"|" + "".join([str(_) for _ in state]) + ">"}, QUBO: {QUBO_cost}, PORTFOLIO: {PORTFOLIO_cost}')
+                    f'state={"|" + "".join([str(_) for _ in state]) + ">"}, QUBO: {QUBO_cost}, PORTFOLIO: {PORTFOLIO_cost}')
 
 
 def qubo_limits(Q: np.ndarray, offset: float):
@@ -233,5 +235,3 @@ def get_qiskit_hamiltonian(indices: List[Tuple[int, int]],
             coeffs.append(float(theta_i))
 
     return SparsePauliOp(data=terms, coeffs=coeffs)
-
-

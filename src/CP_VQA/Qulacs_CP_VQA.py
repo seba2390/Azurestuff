@@ -9,7 +9,7 @@ from qulacs import QuantumState
 
 from src.CP_VQA.CP_VQA import CP_VQA
 from src.Tools import qubo_cost, string_to_array, array_to_string, normalized_cost
-from src.custom_qulacs_gates import RXX, RYY, parametric_RXX, parametric_RYY
+from src.custom_gates.custom_qulacs_gates import RXX, RYY, parametric_RXX, parametric_RYY
 from src.Chain import Chain
 from src.Qubo import Qubo
 from src.Grid import Grid

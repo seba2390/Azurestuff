@@ -9,8 +9,8 @@ from qulacs.gate import H
 from qulacs import QuantumState
 
 from src.QAOA.QAOA import QAOA
-from src.custom_qulacs_gates import RZZ, RZ, RX
-from src.custom_qulacs_gates import parametric_RZZ, parametric_RZ, parametric_RX
+from src.custom_gates.custom_qulacs_gates import RZZ, RZ, RX
+from src.custom_gates.custom_qulacs_gates import parametric_RZZ, parametric_RZ, parametric_RX
 from src.Tools import qubo_cost, string_to_array, array_to_string, normalized_cost
 from src.Qubo import Qubo
 

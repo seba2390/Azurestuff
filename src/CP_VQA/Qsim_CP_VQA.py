@@ -7,7 +7,7 @@ import sympy
 import numpy as np
 
 from src.CP_VQA.CP_VQA import CP_VQA
-from src.custom_cirq_gates import RXX, RYY
+from src.custom_gates.custom_cirq_gates import RXX, RYY
 from src.Tools import qubo_cost, string_to_array, array_to_string, normalized_cost
 from src.Grid import Grid
 from src.Chain import Chain

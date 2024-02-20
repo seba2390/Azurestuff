@@ -4,11 +4,9 @@ import random
 import pytest
 import numpy as np
 from qiskit import QuantumCircuit, Aer, execute
-from qiskit.quantum_info import Operator
 import cirq
-from scipy.linalg import expm
 
-from src.custom_cirq_gates import RXX, RYY
+from src.custom_gates.custom_cirq_gates import RXX, RYY
 
 
 def generate_unique_pairs(N, k):

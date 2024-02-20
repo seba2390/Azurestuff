@@ -12,7 +12,7 @@ from src.Tools import (qubo_cost,
 
 from src.QAOA.QAOA import QAOA
 from src.Qubo import Qubo
-from src.custom_cirq_gates import RZZ, RZ, RX
+from src.custom_gates.custom_cirq_gates import RZZ, RZ, RX
 
 
 class Qsim_QAOA(QAOA):

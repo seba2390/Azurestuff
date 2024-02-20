@@ -1,15 +1,13 @@
-from typing import Sequence, Tuple, List, Union
+from typing import List, Union
 from itertools import combinations
-from time import time
 import os
 
 import cirq
 import qsimcirq
-from cirq.ops.named_qubit import NamedQubit
 import sympy
 import numpy as np
 
-from src.custom_cirq_gates import RXX, RYY
+from src.custom_gates.custom_cirq_gates import RXX, RYY
 from src.Tools import qubo_cost, string_to_array
 from src.Grid import Grid
 from src.Chain import Chain

@@ -1,5 +1,4 @@
 from typing import *
-import random
 
 import pytest
 import numpy as np
@@ -7,7 +6,7 @@ import qiskit
 from qiskit import Aer, execute
 from spynoza import QuantumCircuit, QuantumRegister, PyState
 
-from src.custom_spynoza_gates import RXX, RYY, RZZ, RZ, RX
+from src.custom_gates.custom_spynoza_gates import RXX, RYY, RZZ, RZ, RX
 
 
 def PyState_to_NumpyArray(state: PyState) -> np.ndarray:

@@ -12,7 +12,7 @@ from src.CP_VQA.CP_VQA import CP_VQA
 from src.Grid import Grid
 from src.Chain import Chain
 from src.Qubo import Qubo
-from src.custom_spynoza_gates import RXX, RYY
+from src.custom_gates.custom_spynoza_gates import RXX, RYY
 
 
 class Spynoza_CP_VQA(CP_VQA):

@@ -6,7 +6,7 @@ import numpy as np
 from src.Tools import qubo_cost, string_to_array, normalized_cost, array_to_string
 from src.QAOA.QAOA import QAOA
 from src.Qubo import Qubo
-from src.custom_spynoza_gates import RZZ, RZ, RX
+from src.custom_gates.custom_spynoza_gates import RZZ, RZ, RX
 
 
 class Spynoza_QAOA(QAOA):

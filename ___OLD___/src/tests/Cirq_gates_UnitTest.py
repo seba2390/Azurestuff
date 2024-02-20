@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 import cirq
 from scipy.linalg import expm
-from src.custom_cirq_gates import RXX, RYY
+from src.custom_gates.custom_cirq_gates import RXX, RYY
 
 
 ######################################################################################################

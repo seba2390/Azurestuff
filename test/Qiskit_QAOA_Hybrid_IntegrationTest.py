@@ -37,7 +37,7 @@ def generate_count_test_cases(nr_rng_trials: int) -> List[Tuple[Dict[str, float]
                                                    topology=topology,
                                                    with_next_nearest_neighbors=True)
                 for opt_step in range(__N_OPT_STEPS__):
-                    N_angles = 2 * layers + layers * len(topology.get_NNN_indices())
+                    N_angles = 2 * layers
                     angles = np.random.uniform(-2 * np.pi, 2 * np.pi, N_angles)
                     c = Qiskit_ansatz.get_cost(angles=angles)
                     test_cases.append((Qiskit_ansatz.counts, k))

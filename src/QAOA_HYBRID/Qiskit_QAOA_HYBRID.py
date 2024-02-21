@@ -22,8 +22,8 @@ class Qiskit_QAOA_HYBRID(QAOA_HYBRID):
 
     def set_circuit(self, angles: Union[np.ndarray[float], List[float]]):
 
-        cost_angles = iter(angles[:2*self.layers])
-        mixer_angles = iter(angles[2*self.layers:])
+        cost_angles = iter(angles[:self.layers])
+        mixer_angles = iter(angles[self.layers:])
 
         qcircuit = QuantumCircuit(self.n_qubits)
 
@@ -46,8 +46,8 @@ class Qiskit_QAOA_HYBRID(QAOA_HYBRID):
 
             # ------ Mixer unitary: ------ #
             # XX+YY terms
+            beta_ij = next(mixer_angles)
             for (qubit_i, qubit_j) in self.qubit_indices:
-                beta_ij = next(mixer_angles)
                 qcircuit.rxx(theta=beta_ij, qubit1=qubit_i, qubit2=qubit_j)
                 qcircuit.ryy(theta=beta_ij, qubit1=qubit_i, qubit2=qubit_j)
 

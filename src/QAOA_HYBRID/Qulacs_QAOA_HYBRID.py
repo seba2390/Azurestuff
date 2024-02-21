@@ -32,7 +32,7 @@ class Qulacs_QAOA_HYBRID(QAOA_HYBRID):
         self.block_size = 2
         self.optimizer = qulacs.circuit.QuantumCircuitOptimizer()
 
-        __dummy_angles__ = np.random.uniform(-2 * np.pi, 2 * np.pi, 2 * self.layers + self.layers * len(self.qubit_indices))
+        __dummy_angles__ = np.random.uniform(-2 * np.pi, 2 * np.pi, 2 * self.layers)
         self.circuit = self.set_circuit(angles=__dummy_angles__)
 
         self.states_strings = self.generate_bit_strings(N=self.n_qubits, k=self.k)
@@ -40,8 +40,8 @@ class Qulacs_QAOA_HYBRID(QAOA_HYBRID):
 
     def set_circuit(self, angles):
 
-        cost_angles = iter(angles[:2 * self.layers])
-        mixer_angles = iter(angles[2 * self.layers:])
+        cost_angles = iter(angles[:self.layers])
+        mixer_angles = iter(angles[self.layers:])
 
         if self.use_parametric_circuit_opt:
             qcircuit = ParametricQuantumCircuit(self.n_qubits)
@@ -71,8 +71,8 @@ class Qulacs_QAOA_HYBRID(QAOA_HYBRID):
                     RZ(circuit=qcircuit,angle=2*gamma*h_i, qubit=qubit_i)
 
             # ------ Mixer unitary: ------ #
+            beta = next(mixer_angles)
             for qubit_i, qubit_j in self.qubit_indices:
-                beta = next(mixer_angles)
                 if self.use_parametric_circuit_opt:
                     parametric_RXX(circuit=qcircuit, angle=beta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
                     parametric_RYY(circuit=qcircuit, angle=beta, qubit_1=qubit_i, qubit_2=qubit_j, use_native=True)
@@ -87,8 +87,8 @@ class Qulacs_QAOA_HYBRID(QAOA_HYBRID):
 
     def get_state_vector(self, angles):
         if self.use_parametric_circuit_opt:
-            cost_angles = iter(angles[:2 * self.layers])
-            mixer_angles = iter(angles[2 * self.layers:])
+            cost_angles = iter(angles[:self.layers])
+            mixer_angles = iter(angles[self.layers:])
             idx_counter = 0
             for layer in range(self.layers):
                 gamma = next(cost_angles)
@@ -98,8 +98,8 @@ class Qulacs_QAOA_HYBRID(QAOA_HYBRID):
                 for rz in range(len(self.h_list)):
                     self.circuit.set_parameter(index=idx_counter, parameter=2*gamma*self.h_list[rz][-1])
                     idx_counter += 1
+                beta = next(mixer_angles)
                 for rxx_ryy in range(len(self.qubit_indices)):
-                    beta = next(mixer_angles)
                     self.circuit.set_parameter(index=idx_counter, parameter=beta)
                     idx_counter += 1
                     self.circuit.set_parameter(index=idx_counter, parameter=beta)
@@ -112,8 +112,8 @@ class Qulacs_QAOA_HYBRID(QAOA_HYBRID):
 
     def get_cost(self, angles):
         if self.use_parametric_circuit_opt:
-            cost_angles = iter(angles[:2 * self.layers])
-            mixer_angles = iter(angles[2 * self.layers:])
+            cost_angles = iter(angles[:self.layers])
+            mixer_angles = iter(angles[self.layers:])
             idx_counter = 0
             for layer in range(self.layers):
                 gamma = next(cost_angles)
@@ -123,8 +123,8 @@ class Qulacs_QAOA_HYBRID(QAOA_HYBRID):
                 for rz in range(len(self.h_list)):
                     self.circuit.set_parameter(index=idx_counter, parameter=2 * gamma * self.h_list[rz][-1])
                     idx_counter += 1
+                beta = next(mixer_angles)
                 for rxx_ryy in range(len(self.qubit_indices)):
-                    beta = next(mixer_angles)
                     self.circuit.set_parameter(index=idx_counter, parameter=beta)
                     idx_counter += 1
                     self.circuit.set_parameter(index=idx_counter, parameter=beta)

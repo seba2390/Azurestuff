@@ -107,7 +107,7 @@ class Qulacs_CP_VQA(CP_VQA):
         return cost
 
     def callback(self,  *args, **kwargs):
-        eps = 1e-5
+        eps = 1e-4
         probability_dict = self.counts
         most_probable_state = string_to_array(list(probability_dict.keys())[np.argmax(list(probability_dict.values()))])
         normalized_c = normalized_cost(state=most_probable_state,

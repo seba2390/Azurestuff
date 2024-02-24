@@ -60,7 +60,7 @@ class Qiskit_QAOA(QAOA):
     def callback(self, x):
         probability_dict = self.counts
         most_probable_state = string_to_array(list(probability_dict.keys())[np.argmax(list(probability_dict.values()))])
-        if np.sum(most_probable_state) == self.k:
+        """if np.sum(most_probable_state) == self.k:
             normalized_c = normalized_cost(state=most_probable_state,
                                            QUBO_matrix=self.QUBO.Q,
                                            QUBO_offset=0.0,
@@ -68,7 +68,13 @@ class Qiskit_QAOA(QAOA):
                                            min_cost=self.QUBO.subspace_c_min)
             self.normalized_costs.append(normalized_c)
         else:
-            self.normalized_costs.append(1)
+            self.normalized_costs.append(1)"""
+        normalized_c = normalized_cost(state=most_probable_state,
+                                       QUBO_matrix=self.QUBO.Q,
+                                       QUBO_offset=self.QUBO.offset if np.sum(most_probable_state) == self.k else 0.0,
+                                       max_cost=self.QUBO.subspace_c_max,
+                                       min_cost=self.QUBO.full_space_c_min)
+        self.normalized_costs.append(normalized_c)
         x_min_str = array_to_string(array=self.QUBO.subspace_x_min)
         if x_min_str in list(probability_dict.keys()):
             self.opt_state_probabilities.append(probability_dict[x_min_str])

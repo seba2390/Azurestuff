@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 from src.Chain import Chain
 from src.QAOA_HYBRID.Qiskit_QAOA_HYBRID import Qiskit_QAOA_HYBRID
-from src.QAOA_HYBRID.Qulacs_QAOA_HYBRID import Qulacs_QAOA_HYBRID
+from src.QAOA_HYBRID.Qsim_QAOA_HYBRID import Qsim_QAOA_HYBRID
 from src.Qubo import Qubo
 
 
@@ -37,19 +37,20 @@ def generate_count_test_cases(nr_rng_trials: int) -> List[Tuple[Dict[str, float]
                                                    qubo=Qubo(Q, 0.0),
                                                    topology=topology,
                                                    with_next_nearest_neighbors=True)
-                Qulacs_ansatz = Qulacs_QAOA_HYBRID(N_qubits=N,
+                Qsim_ansatz = Qsim_QAOA_HYBRID(N_qubits=N,
                                                    cardinality=k,
                                                    layers=layers,
                                                    qubo=Qubo(Q, 0.0),
                                                    topology=topology,
-                                                   with_next_nearest_neighbors=True)
+                                                   with_next_nearest_neighbors=True,
+                                                   get_full_state_vector=False)
                 for opt_step in range(__N_OPT_STEPS__):
                     N_angles = 2 * layers
                     angles = np.random.uniform(-2 * np.pi, 2 * np.pi, N_angles)
                     c_1 = Qiskit_ansatz.get_cost(angles=angles)
-                    c_2 = Qulacs_ansatz.get_cost(angles=angles)
+                    c_2 = Qsim_ansatz.get_cost(angles=angles)
                     test_cases.append((filter_small_probabilities(Qiskit_ansatz.counts),
-                                       filter_small_probabilities(Qulacs_ansatz.counts), k))
+                                       filter_small_probabilities(Qsim_ansatz.counts), k))
 
     return test_cases
 
@@ -62,22 +63,22 @@ N_RNG_TRIALS = 10
 
 test_cases_1 = generate_count_test_cases(nr_rng_trials=N_RNG_TRIALS)
 
-@pytest.mark.parametrize('qiskit_counts, qulacs_counts, cardinality', test_cases_1, )
+@pytest.mark.parametrize('qiskit_counts, qsim_counts, cardinality', test_cases_1, )
 def test_probabilities(qiskit_counts: Dict[str, float],
-                       qulacs_counts: Dict[str, float],
+                       qsim_counts: Dict[str, float],
                        cardinality: int):
     # Checking that all probability is included (should sum to approx. 1)
     assert np.isclose(sum([p for p in list(qiskit_counts.values())]), 1.0)
 
     # Checking that all probability is included (should sum to approx. 1)
-    assert np.isclose(sum([p for p in list(qulacs_counts.values())]), 1.0)
+    assert np.isclose(sum([p for p in list(qsim_counts.values())]), 1.0)
 
     # Checking that there is only states w. 'k' excitations
     for state, prob in qiskit_counts.items():
         assert state.count('1') == cardinality
-    for state, prob in qulacs_counts.items():
+    for state, prob in qsim_counts.items():
         assert state.count('1') == cardinality
 
     # Comparing the two:
-    for state, prob in qulacs_counts.items():
+    for state, prob in qsim_counts.items():
         assert np.isclose(prob, qiskit_counts[state])

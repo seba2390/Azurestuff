@@ -119,12 +119,14 @@ def check_qubo(QUBO_matrix: np.ndarray,
 
     N_QUBITS = QUBO_matrix.shape[0]
     for state in generate_binary_permutations(n=N_QUBITS):
-        QUBO_cost = full_qubo_cost(state=state, QUBO_matrix=QUBO_matrix, QUBO_offset=QUBO_offset)
-        PORTFOLIO_cost = portfolio_cost(state=state, mu=expected_returns, sigma=covariances, alpha=alpha)
         if np.sum(state) == k:
+            QUBO_cost = full_qubo_cost(state=state, QUBO_matrix=QUBO_matrix, QUBO_offset=QUBO_offset)
+            PORTFOLIO_cost = portfolio_cost(state=state, mu=expected_returns, sigma=covariances, alpha=alpha)
             if not np.isclose(QUBO_cost, PORTFOLIO_cost):
                 raise ValueError(
                     f'state={"|" + "".join([str(_) for _ in state]) + ">"}, QUBO: {QUBO_cost}, PORTFOLIO: {PORTFOLIO_cost}')
+
+
 
 
 def qubo_limits(Q: np.ndarray, offset: float):

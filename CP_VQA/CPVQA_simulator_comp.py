@@ -68,12 +68,12 @@ def simulate(settings_list: List[dict]) -> List[dict]:
         N_angles = settings['L'] * len(settings['topology'].get_NNN_indices()) if settings['w_nnn'] else settings[
                                                                                                              'L'] * len(
             settings['topology'].get_NN_indices())
-        QAOA_theta_i = np.random.uniform(theta_min, theta_max, 2 * N_angles)
+        CPVQA_theta_i = np.random.uniform(theta_min, theta_max, N_angles)
 
 
         qsim_start_time = time()
         qsim_sim = sc.optimize.minimize(fun=qsim.get_cost,
-                                  x0=QAOA_theta_i,
+                                  x0=CPVQA_theta_i,
                                   method=settings['opt_method'],
                                   options={'disp': False,
                                            'maxiter': settings['max_iter']})
@@ -84,7 +84,7 @@ def simulate(settings_list: List[dict]) -> List[dict]:
 
         qulacs_start_time = time()
         qulacs_sim = sc.optimize.minimize(fun=qulacs.get_cost,
-                                          x0=QAOA_theta_i,
+                                          x0=CPVQA_theta_i,
                                           method=settings['opt_method'],
                                           options={'disp': False,
                                                    'maxiter': settings['max_iter']})
@@ -105,10 +105,10 @@ layer_dict = {2:4,  3:4,  4:4,
               17:4, 18:4, 19:4,
               20:4}
 
-max_iter = 4
+max_iter = 10
 alpha=0.5
-N_seeds = 8
-N_min, N_max = 2, 20
+N_seeds = os.cpu_count()
+N_min, N_max = 2, 15
 sim_settings = []
 for seed in range(N_seeds):
     chunck = []

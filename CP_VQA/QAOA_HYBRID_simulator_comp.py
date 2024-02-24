@@ -105,7 +105,7 @@ layer_dict = {2:4,  3:4,  4:4,
 max_iter = 10
 alpha=0.5
 N_seeds = os.cpu_count()
-N_min, N_max = 2, 15
+N_min, N_max = 2, 18
 sim_settings = []
 for seed in range(N_seeds):
     chunck = []

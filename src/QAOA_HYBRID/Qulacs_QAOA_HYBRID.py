@@ -38,6 +38,7 @@ class Qulacs_QAOA_HYBRID(QAOA_HYBRID):
         self.states_strings = self.generate_bit_strings(N=self.n_qubits, k=self.k)
         self.states_ints = [int(string, 2) for string in self.states_strings]
 
+
     def set_circuit(self, angles):
 
         cost_angles = iter(angles[:self.layers])
@@ -129,6 +130,7 @@ class Qulacs_QAOA_HYBRID(QAOA_HYBRID):
                     idx_counter += 1
                     self.circuit.set_parameter(index=idx_counter, parameter=beta)
                     idx_counter += 1
+
         else:
             self.circuit = self.set_circuit(angles)
         state = QuantumState(self.n_qubits)
@@ -146,7 +148,7 @@ class Qulacs_QAOA_HYBRID(QAOA_HYBRID):
         return cost
 
     def callback(self, x):
-        eps = 1e-4
+        eps = 1e-5
         probability_dict = self.counts
         most_probable_state = string_to_array(list(probability_dict.keys())[np.argmax(list(probability_dict.values()))])
         normalized_c = normalized_cost(state=most_probable_state,
